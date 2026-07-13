@@ -10,15 +10,23 @@ const CF = "https://api.cloudflare.com/client/v4";
 export const TOKEN_DEEPLINK =
   "https://dash.cloudflare.com/profile/api-tokens?permissionGroupKeys=%5B%7B%22key%22%3A%22workers_scripts%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22workers_kv_storage%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22d1%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22account_settings%22%2C%22type%22%3A%22read%22%7D%5D&accountId=*&zoneId=all&name=Nova%20Installer";
 
-// A Cloudflare API token is 40 chars from [A-Za-z0-9_-].
-export const TOKEN_RE = /^[A-Za-z0-9_-]{40}$/;
+// Cloudflare API tokens come in two shapes:
+//   • legacy: a 40-character [A-Za-z0-9_-] string
+//   • current (2026+): a scannable "cfut_" (user) / "cfat_" (account) prefix,
+//     then 40 chars, then a checksum — so the whole thing is a single run of
+//     [A-Za-z0-9_-] that is LONGER than 40 chars.
+// So we never cap at exactly 40 — we take the whole contiguous token run
+// (40 or more chars). Capping at 40 slices a modern token and Cloudflare then
+// rejects it as "Invalid API Token (code 1000)".
+export const TOKEN_RE = /^[A-Za-z0-9_-]{40,}$/;
 
 // Pull a token out of a message even if it's surrounded by other text
-// (e.g. "here is my token: <40 chars>"). Returns the token or null.
+// (e.g. "here is my token: cfut_…"). Returns the full token or null.
 export function extractToken(text) {
-  const s = (text || "").trim();
+  // Drop zero-width / bidi marks a mobile paste (esp. RTL keyboards) can inject.
+  const s = (text || "").replace(/[​-‏‪-‮⁦-⁩﻿]/g, "").trim();
   if (TOKEN_RE.test(s)) return s;
-  const m = s.match(/[A-Za-z0-9_-]{40}/);
+  const m = s.match(/(?:cfut_|cfat_)?[A-Za-z0-9_-]{40,}/);
   return m ? m[0] : null;
 }
 
@@ -79,8 +87,8 @@ export async function install(env, chatId, token, userId, lang = "en") {
     await set("verify", "run");
     const v = await cf("GET", "/user/tokens/verify", token);
     if (!cfOk(v)) {
-      const extra = token.length < 30 ? t(lang, "err_short") : "";
-      return bail("verify", t(lang, "err_token") + extra + `\n\n<i>${cfErr(v)}</i>`);
+      const extra = token.length < 40 ? t(lang, "err_short") : "";
+      return bail("verify", t(lang, "err_token") + extra + `\n\n<i>${cfErr(v)} · len ${token.length}</i>`);
     }
     await set("verify", "done");
 
