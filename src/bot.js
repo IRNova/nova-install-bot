@@ -6,7 +6,7 @@ import {
   touchUser, getConfig, setConfig, listFaq, getFaq, listSections, getSection,
   markBlocked, getUserLang, setUserLang,
 } from "./db.js";
-import { install, TOKEN_DEEPLINK, TOKEN_RE } from "./install.js";
+import { install, TOKEN_DEEPLINK, extractToken } from "./install.js";
 import { t, normLang } from "./i18n.js";
 
 export async function handleUpdate(update, env) {
@@ -34,19 +34,31 @@ export async function handleUpdate(update, env) {
   const text = (msg.text || "").trim();
   if (!text) return;
 
-  // Pasted Cloudflare token → delete + install.
-  if (TOKEN_RE.test(text)) {
+  const cmd = text.split(/\s+/)[0].toLowerCase().replace(/@.*$/, "");
+  const isCommand = text.startsWith("/");
+
+  // A Cloudflare token anywhere in the message → delete it and install.
+  const token = extractToken(text);
+  if (token) {
     await deleteMessage(env, chatId, msg.message_id);
-    return install(env, chatId, text, from.id, lang);
+    await setConfig(env, `await_token_${from.id}`, "");
+    return install(env, chatId, token, from.id, lang);
   }
 
-  const cmd = text.split(/\s+/)[0].toLowerCase().replace(/@.*$/, "");
-
   // Contact mode: the user's next message goes to the admin group.
-  const pending = await getConfig(env, `await_contact_${from.id}`, "");
-  if (pending === "1" && !text.startsWith("/")) {
+  const pendingContact = await getConfig(env, `await_contact_${from.id}`, "");
+  if (pendingContact === "1" && !isCommand) {
     await setConfig(env, `await_contact_${from.id}`, "");
     return forwardContact(env, from, chatId, msg, lang);
+  }
+
+  // Awaiting a token (user tapped Install): a non-command reply that isn't a
+  // valid token gets a clear "that's not a token" explanation instead of the
+  // menu, so people aren't left wondering why nothing happened.
+  const pendingToken = await getConfig(env, `await_token_${from.id}`, "");
+  if (pendingToken === "1" && !isCommand) {
+    await deleteMessage(env, chatId, msg.message_id);
+    return send(env, chatId, t(lang, "not_a_token"), { reply_markup: installKeyboard(lang, true) });
   }
 
   switch (cmd) {
@@ -55,6 +67,7 @@ export async function handleUpdate(update, env) {
     case "/help":
       return sendMenu(env, chatId, from, lang);
     case "/install":
+      await setConfig(env, `await_token_${from.id}`, "1");
       return send(env, chatId, t(lang, "install_text"), { reply_markup: installKeyboard(lang, true) });
     case "/lang":
       return toggleLang(env, chatId, from.id, lang, null);
@@ -128,8 +141,10 @@ async function handleCallback(cb, env) {
 
   if (data === "menu") return replaceWithMenu(env, chatId, msgId, cb.from, lang);
   if (data === "lang") return toggleLang(env, chatId, cb.from.id, lang, msgId);
-  if (data === "install")
+  if (data === "install") {
+    await setConfig(env, `await_token_${cb.from.id}`, "1");
     return edit(env, chatId, msgId, t(lang, "install_text"), { reply_markup: installKeyboard(lang, true) });
+  }
   if (data === "apps")
     return edit(env, chatId, msgId, t(lang, "apps_title"), { reply_markup: appsKeyboard(lang) });
   if (data === "faq") return editFaqList(env, chatId, msgId, lang);
