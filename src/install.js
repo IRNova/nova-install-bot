@@ -13,6 +13,15 @@ export const TOKEN_DEEPLINK =
 // A Cloudflare API token is 40 chars from [A-Za-z0-9_-].
 export const TOKEN_RE = /^[A-Za-z0-9_-]{40}$/;
 
+// Pull a token out of a message even if it's surrounded by other text
+// (e.g. "here is my token: <40 chars>"). Returns the token or null.
+export function extractToken(text) {
+  const s = (text || "").trim();
+  if (TOKEN_RE.test(s)) return s;
+  const m = s.match(/[A-Za-z0-9_-]{40}/);
+  return m ? m[0] : null;
+}
+
 async function cf(method, path, token, body, ctype) {
   const headers = { Authorization: `Bearer ${token}` };
   if (ctype) headers["Content-Type"] = ctype;
@@ -160,14 +169,17 @@ export async function install(env, chatId, token, userId, lang = "en") {
   }
 }
 
+// Poll briefly so the result message is always delivered well within a Worker's
+// background-execution window. If the panel isn't reachable yet, the result
+// shows a "still going live" note rather than the user waiting indefinitely.
 async function waitForOnline(url) {
-  const deadline = Date.now() + 150000;
+  const deadline = Date.now() + 24000;
   while (Date.now() < deadline) {
     try {
       const r = await fetch(url + "/install", { cf: { cacheTtl: 0 } });
       if (r.status > 0 && r.status < 500) return true;
     } catch {}
-    await new Promise((res) => setTimeout(res, 4000));
+    await new Promise((res) => setTimeout(res, 3000));
   }
   return false;
 }

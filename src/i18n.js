@@ -43,6 +43,8 @@ export const STR = {
     err_token: "That token didn't work. Make sure you created it with the Cloudflare Workers template and copied all of it.",
     err_short: " (the token looks too short — the copy was probably cut off)",
     err_generic: "Something went wrong",
+    not_a_token:
+      "That doesn't look like a Cloudflare token. It's one long line, 40 characters, no spaces. Tap <b>Get my token</b> above, create it, and paste the whole code here.\n\n⚠️ Make sure you copy the <b>API Token</b> (not the Global API Key or your account email).",
 
     result_title: "🎉 <b>Your Nova is ready!</b>",
     result_addr: "Your address:",
@@ -116,6 +118,8 @@ export const STR = {
     err_token: "این توکن کار نکرد. مطمئن شو با قالب Cloudflare Workers ساخته‌ای و کاملش را کپی کرده‌ای.",
     err_short: " (توکن خیلی کوتاه به نظر می‌رسد — احتمالاً کپی ناقص بوده)",
     err_generic: "یک خطا رخ داد",
+    not_a_token:
+      "این شبیه توکن Cloudflare نیست. توکن یک خط بلند و ۴۰ کاراکتری بدون فاصله است. دکمهٔ <b>گرفتن توکن</b> بالا را بزن، بسازش و کلِ کد را همین‌جا بچسبان.\n\n⚠️ حتماً <b>API Token</b> را کپی کن (نه Global API Key و نه ایمیل حسابت).",
 
     result_title: "🎉 <b>نوای تو آماده است!</b>",
     result_addr: "آدرس تو:",
