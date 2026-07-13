@@ -97,6 +97,11 @@ textarea{min-height:96px;resize:vertical;line-height:1.6}
 .switch input{width:auto}
 .muted{color:var(--mu);font-size:12.5px}
 .hidden{display:none}
+.gstep{display:flex;gap:11px;padding:9px 0;font-size:13px;color:var(--tx2);line-height:1.75;border-top:1px solid var(--bd)}
+.gstep:first-of-type{border-top:none}
+.gstep .gn{flex:0 0 22px;height:22px;border-radius:50%;background:var(--ac-soft);color:var(--ac);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;margin-top:1px}
+.gstep b{color:var(--tx);font-weight:700}
+.gstep code{background:var(--card2);border:1px solid var(--bd2);border-radius:6px;padding:1px 6px;font-size:12px;direction:ltr;display:inline-block}
 .toast{position:fixed;inset-block-end:22px;inset-inline:0;margin:auto;width:max-content;max-width:88%;
  background:var(--card);border:1px solid var(--bd2);padding:12px 20px;border-radius:12px;box-shadow:var(--shadow);
  opacity:0;transform:translateY(8px);transition:.22s;z-index:60;font-size:13px;font-weight:600}
@@ -191,6 +196,8 @@ export const DASHBOARD_HTML = HEAD("Nova Bot Admin") + `<body>${THEME_BOOT}
   <button class="nav-item" data-p="sections" onclick="nav(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg><span data-k="sections">Sections</span></button>
   <button class="nav-item" data-p="settings" onclick="nav(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span data-k="settings">Settings</span></button>
   <button class="nav-item" data-p="broadcast" onclick="nav(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l18-8-8 18-2-8-8-2z"/></svg><span data-k="broadcast">Broadcast</span></button>
+  <div class="nav-label" data-k="help">Help</div>
+  <button class="nav-item" data-p="guide" onclick="nav(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg><span data-k="guide">Guide</span></button>
   <div class="side-foot">
    <div class="lang" id="lg"><button data-l="en" class="on">EN</button><button data-l="fa">فا</button></div>
    <button class="tool" id="theme" title="Theme">☀ <span data-k="theme">Theme</span></button>
@@ -268,14 +275,17 @@ export const DASHBOARD_HTML = HEAD("Nova Bot Admin") + `<body>${THEME_BOOT}
     <button class="btn" onclick="broadcast()" data-k="bc_send">Send to all users</button>
    </div>
   </div>
+
+  <!-- GUIDE -->
+  <div class="pane" data-pane="guide"><div id="guidebox"></div></div>
  </main>
 </div>
 <div class="toast" id="toast"></div>
 <script>
-var I={en:{manage:'Manage',stats:'Stats',faq:'FAQ',sections:'Sections',settings:'Settings',broadcast:'Broadcast',theme:'Theme',
+var I={en:{manage:'Manage',help:'Help',guide:'Guide',stats:'Stats',faq:'FAQ',sections:'Sections',settings:'Settings',broadcast:'Broadcast',theme:'Theme',
  ptitle_stats:'Stats',psub_stats:'How the bot is doing',ptitle_faq:'FAQ',psub_faq:'Questions users can browse',
  ptitle_sections:'Menu sections',psub_sections:'Custom buttons on the bot menu',ptitle_settings:'Settings',psub_settings:'Welcome text and contact',
- ptitle_broadcast:'Broadcast',psub_broadcast:'Message every user',brandsub:'Admin panel',
+ ptitle_broadcast:'Broadcast',psub_broadcast:'Message every user',ptitle_guide:'Guide',psub_guide:'How each part works',brandsub:'Admin panel',
  st_users:'Users',st_active:'Active (7d)',st_installs:'Panels built',st_builders:'Builders',
  faq_add:'Add a question',faq_add_d:'Shown as a tappable list in the bot. Answers support <b> <i> <a> <code>.',f_q:'Question',f_a:'Answer',order:'Order',add:'Add question',
  sec_add:'Add a menu section',sec_add_d:"Adds a button to the bot's main menu with your text and an optional link.",s_t:'Button title',s_b:'Body (HTML allowed)',s_bt:'Link button text (optional)',s_bu:'Link URL (optional)',add_sec:'Add section',
@@ -284,10 +294,10 @@ var I={en:{manage:'Manage',stats:'Stats',faq:'FAQ',sections:'Sections',settings:
  bc:'Broadcast',bc_d:'Send a message to everyone who has used the bot. HTML allowed. Sends in the background.',bc_send:'Send to all users',
  edit:'Edit',hide:'Hide',show:'Show',del:'Delete',hidden:'hidden',none_faq:'No questions yet.',none_sec:'No sections yet.',
  saved:'Saved',added:'Added',deleted:'Deleted',sending:'Sending to',fill:'Please fill the fields',confirm_del:'Delete this?',confirm_bc:'Send to all users?'},
-fa:{manage:'مدیریت',stats:'آمار',faq:'سؤالات',sections:'بخش‌ها',settings:'تنظیمات',broadcast:'همگانی',theme:'پوسته',
+fa:{manage:'مدیریت',help:'راهنما',guide:'راهنما',stats:'آمار',faq:'سؤالات',sections:'بخش‌ها',settings:'تنظیمات',broadcast:'همگانی',theme:'پوسته',
  ptitle_stats:'آمار',psub_stats:'وضعیت ربات',ptitle_faq:'سؤالات متداول',psub_faq:'سؤال‌هایی که کاربران می‌بینند',
  ptitle_sections:'بخش‌های منو',psub_sections:'دکمه‌های سفارشی منوی ربات',ptitle_settings:'تنظیمات',psub_settings:'متن خوش‌آمد و تماس',
- ptitle_broadcast:'پیام همگانی',psub_broadcast:'ارسال به همهٔ کاربران',brandsub:'پنل مدیریت',
+ ptitle_broadcast:'پیام همگانی',psub_broadcast:'ارسال به همهٔ کاربران',ptitle_guide:'راهنما',psub_guide:'هر بخش چطور کار می‌کند',brandsub:'پنل مدیریت',
  st_users:'کاربران',st_active:'فعال (۷ روز)',st_installs:'پنل ساخته‌شده',st_builders:'سازندگان',
  faq_add:'افزودن سؤال',faq_add_d:'به‌صورت فهرست قابل‌لمس در ربات نشان داده می‌شود. پاسخ‌ها از <b> <i> <a> <code> پشتیبانی می‌کنند.',f_q:'سؤال',f_a:'پاسخ',order:'ترتیب',add:'افزودن سؤال',
  sec_add:'افزودن بخش منو',sec_add_d:'یک دکمه به منوی اصلی ربات با متن شما و یک لینک اختیاری اضافه می‌کند.',s_t:'عنوان دکمه',s_b:'متن (HTML مجاز)',s_bt:'متن دکمهٔ لینک (اختیاری)',s_bu:'آدرس لینک (اختیاری)',add_sec:'افزودن بخش',
@@ -296,6 +306,76 @@ fa:{manage:'مدیریت',stats:'آمار',faq:'سؤالات',sections:'بخش�
  bc:'پیام همگانی',bc_d:'به همهٔ کسانی که از ربات استفاده کرده‌اند پیام بفرست. HTML مجاز است. در پس‌زمینه ارسال می‌شود.',bc_send:'ارسال به همه',
  edit:'ویرایش',hide:'پنهان',show:'نمایش',del:'حذف',hidden:'پنهان',none_faq:'هنوز سؤالی نیست.',none_sec:'هنوز بخشی نیست.',
  saved:'ذخیره شد',added:'اضافه شد',deleted:'حذف شد',sending:'در حال ارسال به',fill:'لطفاً فیلدها را پر کن',confirm_del:'حذف شود؟',confirm_bc:'به همهٔ کاربران ارسال شود؟'}};
+var GUIDE={en:[
+ {h:'👋 Overview',intro:'This panel runs your Nova Telegram bot. Users message the bot to build their own free Nova proxy panel, read your FAQ, and reach your team. Everything below is managed from here and updates the bot instantly.',s:[
+  'The bot works in <b>English and Persian</b>. Each user sees their own language automatically, and can switch it with the 🌐 button in the bot.',
+  'Use the language and theme switches at the bottom of this sidebar. Your choice is remembered on this device.']},
+ {h:'📊 Stats',s:[
+  '<b>Users</b> — everyone who has ever opened the bot.',
+  '<b>Active (7d)</b> — users who used it in the last 7 days.',
+  '<b>Panels built</b> — how many Nova panels were installed through the bot.',
+  '<b>Builders</b> — how many different users built at least one panel.']},
+ {h:'❓ FAQ',s:[
+  'Add a <b>Question</b> and its <b>Answer</b>, then tap <b>Add question</b>. It appears in the bot under the FAQ button.',
+  'Answers accept simple HTML: <code>&lt;b&gt;bold&lt;/b&gt;</code>, <code>&lt;i&gt;italic&lt;/i&gt;</code>, <code>&lt;a href="…"&gt;link&lt;/a&gt;</code>, <code>&lt;code&gt;</code>.',
+  '<b>Order</b> sets the position (lower shows first). <b>Hide</b> keeps an entry without showing it; <b>Delete</b> removes it.']},
+ {h:'🧩 Sections',s:[
+  'Sections are your own buttons on the bot menu — a user guide, a channel, rules, anything.',
+  'Give a <b>Button title</b> (shown on the menu), a <b>Body</b> (the message when tapped, HTML allowed), and optionally a <b>link button</b> (text + URL).',
+  'This is the place to add your own <b>how-to guides for users</b> in each language — create one section in English and one in Persian.']},
+ {h:'⚙️ Settings — Welcome',s:[
+  'The <b>Welcome message</b> shows at the top of the bot menu. Set the <b>English</b> and <b>فارسی</b> boxes separately; leave a box blank to use the built-in default.']},
+ {h:'✉️ Settings — Contact setup',intro:'Let users message your team from the bot. One-time setup:',s:[
+  'In <b>@BotFather</b> send <code>/setprivacy</code>, choose your bot, and tap <b>Disable</b> (so the bot can read admin replies in the group).',
+  'Create a Telegram <b>group</b> for your admins and add <b>@IRNovaProxy_Bot</b> to it.',
+  'In that group send <code>/id</code> — the bot replies with the group ID.',
+  'Paste that ID into <b>Admin group chat ID</b> here and tap <b>Save</b>.',
+  'Now when a user taps <b>Contact us</b> and writes, it appears in your group. <b>Reply</b> to that message in the group and the bot relays your answer back to the user privately.']},
+ {h:'📢 Broadcast',s:[
+  'Type a message and tap <b>Send to all users</b>. It goes to everyone who has used the bot, in the background.',
+  'HTML is allowed. People who blocked the bot are skipped automatically.',
+  'Tip: keep it short and useful — a new feature, an update, a new server. Overuse leads to blocks.']},
+ {h:'🚀 How users install their panel',intro:'What a user experiences when they tap Install — good to know when you help someone:',s:[
+  'They need a free <b>Cloudflare account</b> (the bot links to sign-up).',
+  'They tap <b>Get my token</b>; a pre-filled Cloudflare page opens. They scroll down, <b>Continue to summary</b>, <b>Create Token</b>, and <b>Copy</b> it.',
+  'They paste the token into the chat. The bot <b>deletes it instantly</b> and never stores it, then builds the panel on their own account (~1 min).',
+  'The bot returns their panel address and a button to set their admin password.']},
+],
+fa:[
+ {h:'👋 معرفی',intro:'این پنل، ربات تلگرام نوای شما را اداره می‌کند. کاربران به ربات پیام می‌دهند تا پنل پروکسی نوای رایگان خودشان را بسازند، سؤالات متداول را بخوانند و به تیم شما برسند. همه‌چیزِ زیر از همین‌جا مدیریت می‌شود و ربات فوراً به‌روز می‌شود.',s:[
+  'ربات به دو زبان <b>انگلیسی و فارسی</b> کار می‌کند. هر کاربر به‌طور خودکار زبان خودش را می‌بیند و با دکمهٔ 🌐 در ربات می‌تواند عوضش کند.',
+  'از کلیدهای زبان و پوستهٔ پایین همین نوار کناری استفاده کن. انتخاب تو روی این دستگاه ذخیره می‌شود.']},
+ {h:'📊 آمار',s:[
+  '<b>کاربران</b> — همهٔ کسانی که تا حالا ربات را باز کرده‌اند.',
+  '<b>فعال (۷ روز)</b> — کاربرانی که در ۷ روز گذشته استفاده کرده‌اند.',
+  '<b>پنل ساخته‌شده</b> — چند پنل نوا از طریق ربات نصب شده است.',
+  '<b>سازندگان</b> — چند کاربر متفاوت دست‌کم یک پنل ساخته‌اند.']},
+ {h:'❓ سؤالات متداول',s:[
+  'یک <b>سؤال</b> و <b>پاسخ</b> آن را وارد کن و <b>افزودن سؤال</b> را بزن. زیر دکمهٔ سؤالات در ربات ظاهر می‌شود.',
+  'پاسخ‌ها از HTML ساده پشتیبانی می‌کنند: <code>&lt;b&gt;پررنگ&lt;/b&gt;</code>، <code>&lt;i&gt;مورب&lt;/i&gt;</code>، <code>&lt;a href="…"&gt;لینک&lt;/a&gt;</code>، <code>&lt;code&gt;</code>.',
+  '<b>ترتیب</b> جای نمایش را تعیین می‌کند (کوچک‌تر اول). <b>پنهان</b> سؤال را نگه می‌دارد ولی نشان نمی‌دهد؛ <b>حذف</b> پاکش می‌کند.']},
+ {h:'🧩 بخش‌ها',s:[
+  'بخش‌ها دکمه‌های اختصاصی تو در منوی ربات هستند — راهنمای کاربر، کانال، قوانین، هر چیزی.',
+  'یک <b>عنوان دکمه</b> (روی منو)، یک <b>متن</b> (پیامی که با زدنش نشان داده می‌شود، HTML مجاز) و به‌دلخواه یک <b>دکمهٔ لینک</b> (متن + آدرس) بده.',
+  'اینجا بهترین جا برای افزودن <b>راهنمای کاربران</b> به هر زبان است — یک بخش انگلیسی و یک بخش فارسی بساز.']},
+ {h:'⚙️ تنظیمات — خوش‌آمد',s:[
+  '<b>پیام خوش‌آمد</b> بالای منوی ربات نشان داده می‌شود. کادر <b>English</b> و <b>فارسی</b> را جدا تنظیم کن؛ کادر خالی یعنی استفاده از پیش‌فرض.']},
+ {h:'✉️ تنظیمات — راه‌اندازی تماس',intro:'بگذار کاربران از ربات به تیم تو پیام بدهند. تنظیم یک‌باره:',s:[
+  'در <b>@BotFather</b> دستور <code>/setprivacy</code> را بفرست، ربات را انتخاب کن و <b>Disable</b> را بزن (تا ربات بتواند پاسخ ادمین‌ها را در گروه بخواند).',
+  'یک <b>گروه</b> تلگرام برای ادمین‌ها بساز و <b>@IRNovaProxy_Bot</b> را به آن اضافه کن.',
+  'در آن گروه <code>/id</code> بفرست — ربات آیدی گروه را جواب می‌دهد.',
+  'آن آیدی را در <b>آیدی گروه ادمین</b> همین‌جا بچسبان و <b>ذخیره</b> را بزن.',
+  'حالا وقتی کاربری <b>تماس با ما</b> را می‌زند و می‌نویسد، در گروه شما ظاهر می‌شود. در گروه به آن پیام <b>ریپلای</b> کن تا ربات جوابت را خصوصی به کاربر برساند.']},
+ {h:'📢 پیام همگانی',s:[
+  'یک پیام بنویس و <b>ارسال به همه</b> را بزن. در پس‌زمینه به همهٔ کاربران ربات می‌رود.',
+  'HTML مجاز است. کسانی که ربات را بلاک کرده‌اند به‌طور خودکار رد می‌شوند.',
+  'نکته: کوتاه و مفید نگه‌دار — یک قابلیت تازه، یک به‌روزرسانی، یک سرور جدید. زیاده‌روی باعث بلاک می‌شود.']},
+ {h:'🚀 کاربران چطور پنل نصب می‌کنند',intro:'وقتی کاربری روی نصب می‌زند چه می‌بیند — برای کمک به دیگران خوب است بدانی:',s:[
+  'به یک <b>حساب رایگان Cloudflare</b> نیاز دارد (ربات لینک ثبت‌نام را می‌دهد).',
+  '<b>گرفتن توکن</b> را می‌زند؛ یک صفحهٔ از‌پیش‌پرشدهٔ Cloudflare باز می‌شود. پایین می‌رود، <b>Continue to summary</b>، <b>Create Token</b>، و آن را <b>Copy</b> می‌کند.',
+  'توکن را در چت می‌چسباند. ربات <b>فوراً پاکش می‌کند</b> و هرگز ذخیره‌اش نمی‌کند، بعد پنل را روی حساب خودش می‌سازد (حدود ۱ دقیقه).',
+  'ربات آدرس پنل و دکمه‌ای برای تنظیم رمز ادمین را برمی‌گرداند.']},
+]};
 function $(i){return document.getElementById(i)}
 var lang=localStorage.getItem('nova-lang')||'en',theme=localStorage.getItem('nova-theme')||'dark',cur='stats';
 var api=(m,r,b)=>fetch('/admin/api/'+r,{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined}).then(x=>x.json());
@@ -311,12 +391,17 @@ function applyLang(){document.documentElement.lang=lang;document.documentElement
  [].forEach.call(document.querySelectorAll('#lg button'),function(b){b.classList.toggle('on',b.dataset.l===lang)});
  rerender()}
 function applyTheme(){document.documentElement.setAttribute('data-theme',theme);$('theme').firstChild.textContent=theme==='dark'?'☀ ':'☾ '}
-function rerender(){if(cur==='stats')loadStats();if(cur==='faq')loadFaq();if(cur==='sections')loadSections()}
+function rerender(){if(cur==='stats')loadStats();if(cur==='faq')loadFaq();if(cur==='sections')loadSections();if(cur==='guide')renderGuide()}
+function renderGuide(){var g=GUIDE[lang]||GUIDE.en;$('guidebox').innerHTML=g.map(function(sec){
+ var intro=sec.intro?'<div class="desc">'+sec.intro+'</div>':'';
+ var steps=sec.s.map(function(line,i){return '<div class="gstep"><span class="gn">'+(i+1)+'</span><span>'+line+'</span></div>'}).join('');
+ return '<div class="card"><h2>'+sec.h+'</h2>'+intro+steps+'</div>';
+}).join('')}
 
 function nav(btn){cur=btn.dataset.p;document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('on'));btn.classList.add('on');
  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.dataset.pane===cur));
  $('ptitle').textContent=T('ptitle_'+cur);$('psub').textContent=T('psub_'+cur);$('app').classList.remove('open');
- if(cur==='stats')loadStats();if(cur==='faq')loadFaq();if(cur==='sections')loadSections();if(cur==='settings')loadConfig()}
+ if(cur==='stats')loadStats();if(cur==='faq')loadFaq();if(cur==='sections')loadSections();if(cur==='settings')loadConfig();if(cur==='guide')renderGuide()}
 
 $('lg').onclick=function(e){var b=e.target.closest('button');if(b){lang=b.dataset.l;localStorage.setItem('nova-lang',lang);applyLang()}};
 $('theme').onclick=function(){theme=theme==='dark'?'light':'dark';localStorage.setItem('nova-theme',theme);applyTheme()};
