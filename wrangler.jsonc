@@ -15,5 +15,12 @@
     // Public config — safe to commit. The worker.js the bot installs on the
     // user's account, and the pre-filled Cloudflare token page.
     "WORKER_JS_URL": "https://raw.githubusercontent.com/IRNova/Nova-Proxy/main/worker.js"
-  }
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "nova-bot-db",
+      "database_id": "8532659b-ef4b-43f7-879b-f3a00477801c"
+    }
+  ]
 }
