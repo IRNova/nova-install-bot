@@ -3,6 +3,7 @@
 
 import { send, edit } from "./telegram.js";
 import { bumpInstalls } from "./db.js";
+import { t } from "./i18n.js";
 
 const CF = "https://api.cloudflare.com/client/v4";
 
@@ -43,26 +44,16 @@ function rname() {
   return `${p(A)}-${p(B)}-${rand(4)}`;
 }
 
-const STEPS = [
-  ["verify", "Checking your token"],
-  ["account", "Finding your account"],
-  ["sub", "Setting up your subdomain"],
-  ["db", "Creating the database"],
-  ["kv", "Creating storage"],
-  ["fetch", "Downloading the latest Nova"],
-  ["deploy", "Deploying the worker"],
-  ["enable", "Turning it on"],
-  ["online", "Waiting for it to come online"],
-];
+const STEP_KEYS = ["verify", "account", "sub", "db", "kv", "fetch", "deploy", "enable", "online"];
 
-export async function install(env, chatId, token, userId) {
+export async function install(env, chatId, token, userId, lang = "en") {
   const state = {};
   const render = () =>
-    "🛠 <b>Building your Nova…</b>\n\n" +
-    STEPS.map(([k, label]) => {
+    t(lang, "building") + "\n\n" +
+    STEP_KEYS.map((k) => {
       const s = state[k];
       const icon = s === "done" ? "✅" : s === "err" ? "❌" : s === "run" ? "⏳" : "▫️";
-      return `${icon} ${label}`;
+      return `${icon} ${t(lang, "s_" + k)}`;
     }).join("\n");
 
   const first = await send(env, chatId, render());
@@ -79,10 +70,8 @@ export async function install(env, chatId, token, userId) {
     await set("verify", "run");
     const v = await cf("GET", "/user/tokens/verify", token);
     if (!cfOk(v)) {
-      const extra = token.length < 30 ? " (the token looks too short — the copy was probably cut off)" : "";
-      return bail("verify",
-        "That token didn't work. Make sure you created it with the Cloudflare Workers template " +
-        "and copied all of it." + extra + `\n\n<i>${cfErr(v)}</i>`);
+      const extra = token.length < 30 ? t(lang, "err_short") : "";
+      return bail("verify", t(lang, "err_token") + extra + `\n\n<i>${cfErr(v)}</i>`);
     }
     await set("verify", "done");
 
@@ -165,9 +154,9 @@ export async function install(env, chatId, token, userId) {
     await set("online", "done");
 
     if (userId) await bumpInstalls(env, userId).catch(() => {});
-    await sendResult(env, chatId, panelUrl, online);
+    await sendResult(env, chatId, panelUrl, online, lang);
   } catch (e) {
-    await send(env, chatId, `❌ Something went wrong: <i>${(e && e.message) || "unknown error"}</i>`);
+    await send(env, chatId, `❌ ${t(lang, "err_generic")}: <i>${(e && e.message) || "unknown error"}</i>`);
   }
 }
 
@@ -183,25 +172,20 @@ async function waitForOnline(url) {
   return false;
 }
 
-function sendResult(env, chatId, url, online) {
-  const slow = online
-    ? ""
-    : "\n\n⏳ Your panel is still going live worldwide — Cloudflare can take 1-3 minutes for a new address. " +
-      "If the link errors at first, wait a minute and refresh.";
+function sendResult(env, chatId, url, online, lang = "en") {
   const text =
-    "🎉 <b>Your Nova is ready!</b>\n\n" +
-    `<b>Your address:</b>\n<code>${url}</code>\n\n` +
-    "First, set your admin password using the button below." +
-    slow +
-    "\n\n🇮🇷 <b>In Iran:</b> workers.dev is filtered — in Cloudflare, add a Custom Domain " +
-    "(Workers → your worker → Settings → Domains & Routes) and use that instead.\n\n" +
-    "📱 Then install <b>Nova Client</b>, import your subscription link from the panel, and connect.";
+    t(lang, "result_title") + "\n\n" +
+    `<b>${t(lang, "result_addr")}</b>\n<code>${url}</code>\n\n` +
+    t(lang, "result_setpw") +
+    (online ? "" : t(lang, "result_slow")) +
+    t(lang, "result_iran") +
+    t(lang, "result_apps");
   return send(env, chatId, text, {
     reply_markup: {
       inline_keyboard: [
-        [{ text: "🔓 Set my admin password", url: url + "/install" }],
-        [{ text: "🌐 Open my panel", url }],
-        [{ text: "📱 Get the Nova app", url: "https://github.com/IRNova/Nova-Client/releases" }],
+        [{ text: t(lang, "btn_setpw"), url: url + "/install" }],
+        [{ text: t(lang, "btn_open_panel"), url }],
+        [{ text: t(lang, "btn_get_app"), url: "https://github.com/IRNova/Nova-Client/releases" }],
       ],
     },
   });

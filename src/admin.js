@@ -99,17 +99,16 @@ async function handleApi(request, env, ctx, res, method) {
   }
 
   // ── config ──
+  const CONFIG_KEYS = ["welcome", "welcome_en", "welcome_fa",
+    "contact_group_id", "contact_enabled", "faq_enabled"];
   if (res === "config" && method === "GET") {
-    const keys = ["welcome", "contact_group_id", "contact_enabled", "faq_enabled"];
     const out = {};
-    for (const k of keys) out[k] = await getConfig(env, k, "");
+    for (const k of CONFIG_KEYS) out[k] = await getConfig(env, k, "");
     return json(out);
   }
   if (res === "config" && method === "POST") {
     for (const [k, v] of Object.entries(body)) {
-      if (["welcome", "contact_group_id", "contact_enabled", "faq_enabled"].includes(k)) {
-        await setConfig(env, k, v);
-      }
+      if (CONFIG_KEYS.includes(k)) await setConfig(env, k, v);
     }
     return json({ ok: true });
   }

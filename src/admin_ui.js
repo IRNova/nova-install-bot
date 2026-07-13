@@ -1,201 +1,368 @@
-// Admin panel HTML. Kept as template strings so the whole bot ships as one Worker.
+// Admin panel HTML — Nova brand design system (tokens copied from the production
+// Nova panel), Inter + Vazirmatn, light/dark, English + Persian with RTL,
+// enterprise sidebar layout. Shipped inline so the whole bot is one Worker.
+
+const LOGO = `<svg viewBox="0 0 1254 1254" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="ng" x1="128" y1="1122" x2="1206" y2="44" gradientUnits="userSpaceOnUse"><stop offset=".04" stop-color="#9d4efb"/><stop offset="1" stop-color="#02cdf3"/></linearGradient></defs><path d="M1185.57,149.23c0-43.84-27.55-82.6-66.19-100.7-40.83-19.13-87.98-16.85-126.82,6.19-33.3,19.76-56.22,55.99-56.25,95.68l-.38,653.25.09,39.98c.03,13.51-.33,26.37-3.82,39.13-8.12,29.65-30.52,53.04-56.69,62.39-32.53,11.62-65.87,5.5-91.07-15.75-20.65-17.42-33.28-42.64-33.32-70.11l-.35-245.85.07-231.05c.04-148.83-97.26-281.46-240.38-321.81-67.49-19.02-138.62-19.66-204.99,2.42l-13.66,4.55C159.84,114.72,68.42,239.99,68.41,381.43l-.06,712.76c0,68.93,56.48,123.39,124.03,124.15,65.31.73,125.56-52.18,125.64-120.57l.88-712.63c.07-54.62,49.94-96.23,103.56-88.53,43.56,6.25,78.96,43.23,79.08,88.34l1.24,493.92c.16,62.52,24.72,123.29,59.49,174.21,43.7,63.99,108.48,111.28,182.25,133.98,91.72,28.23,190.9,16.68,273.4-31.79,36.89-21.68,68.83-50.13,94.95-83.49l16.54-23.16c31.76-44.47,56.26-119.27,56.25-174.93l-.09-724.43Z" fill="url(#ng)"/></svg>`;
 
 const STYLE = `
-:root{--bg:#05060a;--bg2:#090b12;--card:rgba(255,255,255,.04);--card2:rgba(255,255,255,.07);
---line:rgba(255,255,255,.10);--line2:rgba(255,255,255,.18);--tx:#eef1f7;--mu:#9aa4b8;
---cyan:#22d3ee;--violet:#a855f7;--grad:linear-gradient(120deg,#22d3ee,#818cf8 50%,#a855f7);
---ok:#34d399;--bad:#f87171;--r:14px;--font:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
-*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--font);line-height:1.55}
-a{color:var(--cyan)}
-.bar{display:flex;align-items:center;justify-content:space-between;padding:14px 20px;
-border-bottom:1px solid var(--line);background:rgba(5,6,10,.7);backdrop-filter:blur(12px);
-position:sticky;top:0;z-index:10}
-.logo{display:flex;align-items:center;gap:10px;font-weight:800;font-size:1.1rem}
-.mk{width:30px;height:30px;border-radius:8px;background:var(--grad);display:flex;align-items:center;
-justify-content:center;font-weight:900;color:#05060a}
-.wrap{max-width:820px;margin:0 auto;padding:20px}
-.tabs{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 18px}
-.tabs button{border:1px solid var(--line2);background:var(--card2);color:var(--mu);cursor:pointer;
-font:inherit;font-weight:600;font-size:.9rem;padding:8px 14px;border-radius:999px}
-.tabs button.on{color:#05060a;background:var(--grad);border-color:transparent}
-.card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px;margin:0 0 16px}
-h2{font-size:1.05rem;margin:0 0 12px}
-label{display:block;font-weight:600;font-size:.85rem;margin:12px 0 6px}
-input,textarea,select{width:100%;background:#0b0e16;border:1px solid var(--line);border-radius:10px;
-color:var(--tx);font:inherit;font-size:.95rem;padding:11px 12px}
-input:focus,textarea:focus{outline:none;border-color:var(--cyan)}
-textarea{min-height:90px;resize:vertical}
-.btn{display:inline-flex;align-items:center;gap:8px;background:var(--grad);color:#05060a;font-weight:700;
-border:none;border-radius:10px;padding:11px 18px;cursor:pointer;font:inherit;font-size:.95rem;margin-top:14px}
-.btn.ghost{background:var(--card2);color:var(--tx);border:1px solid var(--line2)}
-.btn.sm{padding:7px 12px;font-size:.85rem;margin:0}
-.btn.bad{background:rgba(248,113,113,.15);color:#fecaca;border:1px solid rgba(248,113,113,.4)}
-.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
-.stat{background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:16px}
-.stat .n{font-size:1.9rem;font-weight:800;background:var(--grad);-webkit-background-clip:text;
-background-clip:text;color:transparent}
-.stat .l{color:var(--mu);font-size:.85rem}
-.item{border:1px solid var(--line);border-radius:12px;padding:14px;margin:0 0 10px;background:var(--card2)}
-.item .q{font-weight:700}
-.item .a{color:var(--mu);font-size:.9rem;white-space:pre-wrap;margin-top:4px}
-.muted{color:var(--mu);font-size:.85rem}
-.switch{display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:.9rem}
-.hidden{display:none}
-.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--card2);
-border:1px solid var(--line2);padding:12px 18px;border-radius:12px;opacity:0;transition:opacity .25s;z-index:50}
-.toast.show{opacity:1}
-.login{max-width:360px;margin:12vh auto;padding:0 20px;text-align:center}
-.login .mk{margin:0 auto 16px;width:52px;height:52px;font-size:24px;border-radius:14px}
-`;
+:root{
+ --bg:#f4f6fb;--panel:#ffffff;--card:#ffffff;--card2:#f7f9fc;--bd:#e6eaf1;--bd2:#dde2eb;
+ --tx:#101622;--tx2:#3a465c;--mu:#5f6a7d;--ac:#0ea5c4;--ac2:#7c3aed;
+ --grad:linear-gradient(120deg,#0891b2,#7c3aed);--ring:rgba(8,145,178,.25);
+ --ok:#047857;--dg:#dc2626;--wn:#b45309;
+ --shadow:0 1px 2px rgba(20,40,80,.04),0 10px 28px rgba(40,60,110,.10);
+ --ac-soft:color-mix(in srgb,var(--ac) 12%,transparent);--radius:12px;--sidebar:252px}
+html[data-theme=dark]{
+ --bg:#070809;--panel:#0c0e12;--card:#101319;--card2:#0b0d11;--bd:#1c2027;--bd2:#262b34;
+ --tx:#e9edf4;--tx2:#aeb6c4;--mu:#6f7888;--ac:#22d3ee;--ac2:#a855f7;
+ --grad:linear-gradient(120deg,#22d3ee,#7c5cff);--ring:rgba(34,211,238,.30);
+ --ok:#34d399;--dg:#f87171;--wn:#f5b042;
+ --shadow:0 1px 0 rgba(255,255,255,.02),0 12px 30px rgba(0,0,0,.45);
+ --ac-soft:color-mix(in srgb,var(--ac) 15%,transparent)}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{overflow-x:clip;-webkit-text-size-adjust:100%}
+body{font-family:'Inter','Vazirmatn',system-ui,-apple-system,Segoe UI,Tahoma,sans-serif;
+ background:var(--bg);color:var(--tx);min-height:100vh;font-size:14px;line-height:1.5;-webkit-font-smoothing:antialiased}
+html[dir=rtl] body{font-family:'Vazirmatn','Inter',system-ui,Tahoma,sans-serif}
+a{color:var(--ac);text-decoration:none}
+button{font-family:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--ac);outline-offset:2px;border-radius:6px}
+::selection{background:var(--ac-soft)}
 
-export function LOGIN_HTML(failed) {
-  return `<!doctype html><html><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Nova Bot Admin</title><style>${STYLE}</style></head><body>
-<div class="login">
-  <div class="mk">N</div>
-  <h2>Nova Bot Admin</h2>
-  ${failed ? '<p style="color:var(--bad)">Wrong password.</p>' : '<p class="muted">Enter your admin password.</p>'}
-  <form method="POST" action="/admin/login">
-    <input type="password" name="password" placeholder="Password" autofocus autocomplete="current-password">
-    <button class="btn" style="width:100%" type="submit">Sign in</button>
-  </form>
-</div></body></html>`;
+/* Layout */
+.app{display:grid;grid-template-columns:var(--sidebar) 1fr;min-height:100vh}
+.sidebar{background:var(--panel);border-right:1px solid var(--bd);padding:18px 14px;display:flex;flex-direction:column;gap:4px;position:sticky;top:0;height:100vh}
+html[dir=rtl] .sidebar{border-right:none;border-left:1px solid var(--bd)}
+.brand{display:flex;align-items:center;gap:11px;padding:6px 8px 16px}
+.brand .lg{width:38px;height:38px;border-radius:11px;background:var(--card2);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;padding:6px}
+.brand .lg svg{width:100%;height:100%;display:block}
+.brand .nm{font-weight:800;font-size:15px;letter-spacing:-.2px}
+.brand .nm small{display:block;font-weight:500;font-size:11px;color:var(--mu);letter-spacing:.2px}
+.nav-label{font-size:10px;font-weight:700;letter-spacing:1.4px;color:var(--mu);text-transform:uppercase;padding:12px 10px 6px}
+.nav-item{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;color:var(--tx2);border:none;background:transparent;width:100%;text-align:start;font-size:13.5px;font-weight:600;position:relative}
+.nav-item svg{width:18px;height:18px;flex:0 0 18px;opacity:.75}
+.nav-item:hover{background:var(--card2);color:var(--tx)}
+.nav-item.on{background:var(--card2);color:var(--tx)}
+.nav-item.on::before{content:'';position:absolute;inset-inline-start:0;top:9px;bottom:9px;width:3px;border-radius:0 3px 3px 0;background:var(--grad)}
+html[dir=rtl] .nav-item.on::before{border-radius:3px 0 0 3px}
+.nav-item.on svg{opacity:1;color:var(--ac)}
+.side-foot{margin-top:auto;display:flex;gap:8px;padding-top:12px}
+.side-foot .tool{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;height:38px;background:var(--card2);border:1px solid var(--bd);border-radius:10px;color:var(--tx2);font-size:12px;font-weight:600}
+.side-foot .tool:hover{color:var(--ac);border-color:var(--bd2)}
+.lang{display:flex;gap:3px;background:var(--card2);border:1px solid var(--bd);border-radius:10px;padding:3px}
+.lang button{border:none;background:transparent;color:var(--mu);font:inherit;font-size:12px;font-weight:700;padding:6px 11px;border-radius:7px}
+.lang button.on{background:var(--ac);color:#fff}
+
+/* Main */
+.main{padding:26px 30px;max-width:900px}
+.topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:22px}
+.topbar h1{font-size:20px;font-weight:800;letter-spacing:-.3px}
+.topbar .sub{color:var(--mu);font-size:12.5px;margin-top:2px}
+.pane{display:none}
+.pane.on{display:block}
+
+/* Cards & forms */
+.card{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:20px;margin:0 0 16px;box-shadow:var(--shadow)}
+.card h2{font-size:14px;font-weight:700;margin-bottom:4px}
+.card .desc{color:var(--mu);font-size:12.5px;margin-bottom:14px}
+label{display:block;font-size:12px;color:var(--tx2);font-weight:600;margin:14px 0 6px}
+label:first-of-type{margin-top:0}
+input,textarea{width:100%;background:var(--card2);border:1px solid var(--bd2);border-radius:11px;
+ padding:12px 13px;color:var(--tx);font:inherit;font-size:14px;outline:none;transition:.12s}
+input:focus,textarea:focus{border-color:var(--ac);box-shadow:0 0 0 3px var(--ring)}
+textarea{min-height:96px;resize:vertical;line-height:1.6}
+.btn{display:inline-flex;align-items:center;gap:8px;background:var(--ac);color:#fff;font-weight:700;
+ border:none;border-radius:11px;padding:12px 18px;font-size:14px;margin-top:16px;transition:.12s}
+.btn:hover{filter:brightness(1.06)}
+.btn.ghost{background:var(--card2);color:var(--tx);border:1px solid var(--bd2)}
+.btn.sm{padding:8px 13px;font-size:12.5px;margin:0}
+.btn.dg{background:color-mix(in srgb,var(--dg) 12%,transparent);color:var(--dg);border:1px solid color-mix(in srgb,var(--dg) 40%,transparent)}
+.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+
+/* Stats */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
+.stat{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:18px;box-shadow:var(--shadow)}
+.stat .n{font-size:2rem;font-weight:800;line-height:1;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+.stat .l{color:var(--mu);font-size:12px;margin-top:8px;font-weight:600}
+
+/* List items */
+.item{border:1px solid var(--bd);border-radius:13px;padding:15px;margin:0 0 11px;background:var(--card)}
+.item .q{font-weight:700;font-size:13.5px}
+.item .a{color:var(--tx2);font-size:12.8px;white-space:pre-wrap;margin-top:5px;line-height:1.6}
+.item .meta{color:var(--mu);font-size:11.5px;margin-top:5px}
+.pill{display:inline-block;font-size:10.5px;font-weight:700;padding:2px 9px;border-radius:999px;border:1px solid var(--bd2);color:var(--mu);background:var(--card2);margin-inline-start:6px}
+.pill.off{color:var(--wn);border-color:color-mix(in srgb,var(--wn) 40%,transparent)}
+.switch{display:inline-flex;align-items:center;gap:9px;font-size:13px;color:var(--tx2);font-weight:600;cursor:pointer;margin-top:14px}
+.switch input{width:auto}
+.muted{color:var(--mu);font-size:12.5px}
+.hidden{display:none}
+.toast{position:fixed;inset-block-end:22px;inset-inline:0;margin:auto;width:max-content;max-width:88%;
+ background:var(--card);border:1px solid var(--bd2);padding:12px 20px;border-radius:12px;box-shadow:var(--shadow);
+ opacity:0;transform:translateY(8px);transition:.22s;z-index:60;font-size:13px;font-weight:600}
+.toast.show{opacity:1;transform:none}
+
+/* Mobile */
+.menu-btn{display:none}
+.scrim{display:none}
+@media (max-width:820px){
+ .app{grid-template-columns:1fr}
+ .sidebar{position:fixed;inset-block:0;inset-inline-start:0;width:262px;z-index:50;transform:translateX(-110%);transition:transform .2s;box-shadow:var(--shadow)}
+ html[dir=rtl] .sidebar{transform:translateX(110%)}
+ .app.open .sidebar{transform:none}
+ .scrim{display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:40}
+ .app.open .scrim{display:block}
+ .menu-btn{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border:1px solid var(--bd);background:var(--card);border-radius:10px;color:var(--tx);margin-inline-end:12px}
+ .main{padding:18px 16px}
+ .two{grid-template-columns:1fr}
+ input,textarea{font-size:16px}
 }
 
-export const DASHBOARD_HTML = `<!doctype html><html><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Nova Bot Admin</title><style>${STYLE}</style></head><body>
-<div class="bar">
-  <div class="logo"><span class="mk">N</span> Nova Bot Admin</div>
-  <a class="btn ghost sm" href="/admin/logout">Sign out</a>
-</div>
-<div class="wrap">
-  <div class="tabs" id="tabs"></div>
+/* Login */
+.login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px;
+ background:radial-gradient(820px 420px at 50% -6%,color-mix(in srgb,var(--ac) 15%,transparent),transparent 60%),
+ radial-gradient(720px 420px at 88% 8%,color-mix(in srgb,var(--ac2) 13%,transparent),transparent 55%),var(--bg)}
+.login .box{width:100%;max-width:392px}
+.login .head{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.login .lg{width:40px;height:40px;border-radius:12px;background:var(--card2);border:1px solid var(--bd);padding:7px}
+.login .lg svg{width:100%;height:100%}
+`;
 
-  <!-- STATS -->
-  <div class="pane" data-pane="stats">
-    <div class="card"><h2>Overview</h2><div class="grid" id="stats"></div></div>
+const HEAD = (title) => `<!doctype html><html lang="en" dir="ltr" data-theme="dark"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>${title}</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🚀%3C/text%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Vazirmatn:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>${STYLE}</style></head>`;
+
+const THEME_BOOT = `<script>
+try{var th=localStorage.getItem('nova-theme')||'dark';document.documentElement.setAttribute('data-theme',th);
+var lg=localStorage.getItem('nova-lang')||'en';document.documentElement.lang=lg;document.documentElement.dir=lg==='fa'?'rtl':'ltr';}catch(e){}
+</script>`;
+
+export function LOGIN_HTML(failed) {
+  return HEAD("Nova Bot Admin") + `<body>${THEME_BOOT}
+<div class="login"><div class="box">
+ <div class="head">
+  <div style="display:flex;align-items:center;gap:11px">
+   <span class="lg">${LOGO}</span>
+   <div><div style="font-weight:800;font-size:16px" id="brand">Nova Bot</div><div class="muted" id="brandsub" style="font-size:11px">Admin panel</div></div>
+  </div>
+  <div class="row" style="gap:8px">
+   <div class="lang" id="lg"><button data-l="en" class="on">EN</button><button data-l="fa">فا</button></div>
+   <button class="tool" id="theme" title="Theme" style="width:40px;height:38px;background:var(--card2);border:1px solid var(--bd);border-radius:10px;color:var(--tx2)">☀</button>
+  </div>
+ </div>
+ <div class="card">
+  <div style="font-size:11px;color:var(--mu);text-transform:uppercase;letter-spacing:1.4px;font-weight:700;margin-bottom:14px" id="t1">Sign in to the admin panel</div>
+  ${failed ? '<p style="color:var(--dg);font-size:13px;margin-bottom:12px" id="bad">Wrong password.</p>' : ''}
+  <form method="POST" action="/admin/login">
+   <label id="lpw">Password</label>
+   <input type="password" name="password" id="pw" placeholder="password" autofocus autocomplete="current-password">
+   <button class="btn" style="width:100%;justify-content:center" type="submit" id="go">Sign in</button>
+  </form>
+ </div>
+ <p class="muted" style="text-align:center;margin-top:16px;font-size:11.5px" id="ft">Nova Proxy, open-source networking tools</p>
+</div></div>
+<script>
+var T={en:{t1:'Sign in to the admin panel',lpw:'Password',pw:'password',go:'Sign in',bad:'Wrong password.',bs:'Admin panel',ft:'Nova Proxy, open-source networking tools'},
+fa:{t1:'ورود به پنل مدیریت',lpw:'رمز عبور',pw:'رمز عبور',go:'ورود',bad:'رمز اشتباه است.',bs:'پنل مدیریت',ft:'نوا پروکسی، ابزار شبکه متن‌باز'}};
+function $(i){return document.getElementById(i)}
+var lang=localStorage.getItem('nova-lang')||'en',theme=localStorage.getItem('nova-theme')||'dark';
+function ap(){var t=T[lang];document.documentElement.lang=lang;document.documentElement.dir=lang==='fa'?'rtl':'ltr';
+$('t1').textContent=t.t1;$('lpw').textContent=t.lpw;$('pw').placeholder=t.pw;$('go').textContent=t.go;$('brandsub').textContent=t.bs;$('ft').textContent=t.ft;
+if($('bad'))$('bad').textContent=t.bad;[].forEach.call(document.querySelectorAll('#lg button'),function(b){b.classList.toggle('on',b.dataset.l===lang)})}
+function at(){document.documentElement.setAttribute('data-theme',theme);$('theme').textContent=theme==='dark'?'☀':'☾'}
+$('lg').onclick=function(e){var b=e.target.closest('button');if(b){lang=b.dataset.l;localStorage.setItem('nova-lang',lang);ap()}};
+$('theme').onclick=function(){theme=theme==='dark'?'light':'dark';localStorage.setItem('nova-theme',theme);at()};
+at();ap();
+</script></body></html>`;
+}
+
+export const DASHBOARD_HTML = HEAD("Nova Bot Admin") + `<body>${THEME_BOOT}
+<div class="app" id="app">
+ <div class="scrim" onclick="toggleNav()"></div>
+ <aside class="sidebar">
+  <div class="brand"><span class="lg">${LOGO}</span><span class="nm">Nova Bot<small id="brandsub">Admin panel</small></span></div>
+  <div class="nav-label" data-k="manage">Manage</div>
+  <button class="nav-item on" data-p="stats" onclick="nav(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="8"/><rect x="12" y="6" width="3" height="12"/><rect x="17" y="13" width="3" height="5"/></svg><span data-k="stats">Stats</span></button>
+  <button class="nav-item" data-p="faq" onclick="nav(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12" y2="17"/></svg><span data-k="faq">FAQ</span></button>
+  <button class="nav-item" data-p="sections" onclick="nav(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg><span data-k="sections">Sections</span></button>
+  <button class="nav-item" data-p="settings" onclick="nav(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span data-k="settings">Settings</span></button>
+  <button class="nav-item" data-p="broadcast" onclick="nav(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l18-8-8 18-2-8-8-2z"/></svg><span data-k="broadcast">Broadcast</span></button>
+  <div class="side-foot">
+   <div class="lang" id="lg"><button data-l="en" class="on">EN</button><button data-l="fa">فا</button></div>
+   <button class="tool" id="theme" title="Theme">☀ <span data-k="theme">Theme</span></button>
+   <a class="tool" href="/admin/logout" style="flex:0 0 auto"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg></a>
+  </div>
+ </aside>
+
+ <main class="main">
+  <div class="topbar">
+   <div style="display:flex;align-items:center">
+    <button class="menu-btn" onclick="toggleNav()"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+    <div><h1 id="ptitle">Stats</h1><div class="sub" id="psub">How the bot is doing</div></div>
+   </div>
   </div>
 
+  <!-- STATS -->
+  <div class="pane on" data-pane="stats"><div class="grid" id="stats"></div></div>
+
   <!-- FAQ -->
-  <div class="pane hidden" data-pane="faq">
-    <div class="card">
-      <h2>Add a question</h2>
-      <label>Question</label><input id="fq" placeholder="How do I connect?">
-      <label>Answer (HTML allowed: &lt;b&gt; &lt;i&gt; &lt;a&gt; &lt;code&gt;)</label>
-      <textarea id="fa" placeholder="Open the app, paste your subscription link…"></textarea>
-      <label>Order</label><input id="fp" type="number" value="0" style="max-width:120px">
-      <button class="btn" onclick="addFaq()">Add question</button>
-    </div>
-    <div id="faqlist"></div>
+  <div class="pane" data-pane="faq">
+   <div class="card">
+    <h2 data-k="faq_add">Add a question</h2>
+    <div class="desc" data-k="faq_add_d">Shown as a tappable list in the bot. Answers support &lt;b&gt; &lt;i&gt; &lt;a&gt; &lt;code&gt;.</div>
+    <label data-k="f_q">Question</label><input id="fq">
+    <label data-k="f_a">Answer</label><textarea id="fa"></textarea>
+    <label data-k="order">Order</label><input id="fp" type="number" value="0" style="max-width:120px">
+    <button class="btn" onclick="addFaq()" data-k="add">Add question</button>
+   </div>
+   <div id="faqlist"></div>
   </div>
 
   <!-- SECTIONS -->
-  <div class="pane hidden" data-pane="sections">
-    <div class="card">
-      <h2>Add a menu section</h2>
-      <p class="muted">Adds a button to the bot's main menu. Tapping it shows your text (and an optional link button).</p>
-      <label>Button title</label><input id="st" placeholder="📖 User guide">
-      <label>Body (HTML allowed)</label><textarea id="sb" placeholder="Here's how to get started…"></textarea>
-      <div class="row">
-        <div style="flex:1"><label>Link button text (optional)</label><input id="sbt" placeholder="Open guide"></div>
-        <div style="flex:1"><label>Link URL (optional)</label><input id="sbu" placeholder="https://…"></div>
-      </div>
-      <label>Order</label><input id="sp" type="number" value="0" style="max-width:120px">
-      <button class="btn" onclick="addSection()">Add section</button>
+  <div class="pane" data-pane="sections">
+   <div class="card">
+    <h2 data-k="sec_add">Add a menu section</h2>
+    <div class="desc" data-k="sec_add_d">Adds a button to the bot's main menu with your text and an optional link.</div>
+    <label data-k="s_t">Button title</label><input id="st">
+    <label data-k="s_b">Body (HTML allowed)</label><textarea id="sb"></textarea>
+    <div class="two">
+     <div><label data-k="s_bt">Link button text (optional)</label><input id="sbt"></div>
+     <div><label data-k="s_bu">Link URL (optional)</label><input id="sbu"></div>
     </div>
-    <div id="seclist"></div>
+    <label data-k="order">Order</label><input id="sp" type="number" value="0" style="max-width:120px">
+    <button class="btn" onclick="addSection()" data-k="add_sec">Add section</button>
+   </div>
+   <div id="seclist"></div>
   </div>
 
   <!-- SETTINGS -->
-  <div class="pane hidden" data-pane="settings">
-    <div class="card">
-      <h2>Welcome message</h2>
-      <p class="muted">Shown at the top of the main menu. Leave blank for the default.</p>
-      <textarea id="welcome" placeholder="Default welcome is used when empty."></textarea>
-      <button class="btn" onclick="saveConfig()">Save</button>
-    </div>
-    <div class="card">
-      <h2>Contact us</h2>
-      <label class="switch"><input type="checkbox" id="contact_enabled" style="width:auto"> Enable "Contact us"</label>
-      <label>Admin group chat ID</label>
-      <input id="contact_group_id" placeholder="-1001234567890">
-      <p class="muted">Create a Telegram group, add <b>@IRNovaProxy_Bot</b> as an admin, send <code>/id</code> in the group, and paste the ID here. User messages arrive there; reply to a message to answer that user.</p>
-      <label class="switch" style="margin-top:12px"><input type="checkbox" id="faq_enabled" style="width:auto"> Show FAQ in menu</label>
-      <button class="btn" onclick="saveConfig()">Save</button>
-    </div>
+  <div class="pane" data-pane="settings">
+   <div class="card">
+    <h2 data-k="welcome">Welcome message</h2>
+    <div class="desc" data-k="welcome_d">Shown at the top of the main menu. Leave blank for the default. Set each language separately.</div>
+    <label>English</label><textarea id="welcome_en"></textarea>
+    <label>فارسی</label><textarea id="welcome_fa" dir="rtl"></textarea>
+    <button class="btn" onclick="saveConfig()" data-k="save">Save</button>
+   </div>
+   <div class="card">
+    <h2 data-k="contact">Contact us</h2>
+    <label class="switch"><input type="checkbox" id="contact_enabled"> <span data-k="c_enable">Enable "Contact us"</span></label>
+    <label data-k="c_group">Admin group chat ID</label>
+    <input id="contact_group_id" placeholder="-1001234567890">
+    <div class="desc" style="margin-top:8px" data-k="c_group_d">Create a Telegram group, add <b>@IRNovaProxy_Bot</b> as an admin, send <code>/id</code> in the group, and paste the ID here. Reply to a forwarded message to answer that user.</div>
+    <label class="switch"><input type="checkbox" id="faq_enabled"> <span data-k="show_faq">Show FAQ in menu</span></label>
+    <div><button class="btn" onclick="saveConfig()" data-k="save">Save</button></div>
+   </div>
   </div>
 
   <!-- BROADCAST -->
-  <div class="pane hidden" data-pane="broadcast">
-    <div class="card">
-      <h2>Broadcast</h2>
-      <p class="muted">Send a message to everyone who has used the bot. HTML allowed. Sends in the background.</p>
-      <textarea id="bc" placeholder="📢 New Nova update is out…"></textarea>
-      <button class="btn" onclick="broadcast()">Send to all users</button>
-    </div>
+  <div class="pane" data-pane="broadcast">
+   <div class="card">
+    <h2 data-k="bc">Broadcast</h2>
+    <div class="desc" data-k="bc_d">Send a message to everyone who has used the bot. HTML allowed. Sends in the background.</div>
+    <textarea id="bc" style="min-height:120px"></textarea>
+    <button class="btn" onclick="broadcast()" data-k="bc_send">Send to all users</button>
+   </div>
   </div>
+ </main>
 </div>
 <div class="toast" id="toast"></div>
 <script>
-const PANES=[['stats','📊 Stats'],['faq','❓ FAQ'],['sections','🧩 Sections'],['settings','⚙️ Settings'],['broadcast','📢 Broadcast']];
-const tabs=document.getElementById('tabs');
-PANES.forEach(([id,label],i)=>{const b=document.createElement('button');b.textContent=label;b.onclick=()=>show(id,b);if(i===0)b.className='on';tabs.appendChild(b);});
-function show(id,btn){document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('hidden',p.dataset.pane!==id));
-document.querySelectorAll('.tabs button').forEach(b=>b.classList.remove('on'));btn.classList.add('on');
-if(id==='stats')loadStats();if(id==='faq')loadFaq();if(id==='sections')loadSections();if(id==='settings')loadConfig();}
-function toast(m){const t=document.getElementById('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1800);}
-const api=(m,r,b)=>fetch('/admin/api/'+r,{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined}).then(x=>x.json());
-const esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+var I={en:{manage:'Manage',stats:'Stats',faq:'FAQ',sections:'Sections',settings:'Settings',broadcast:'Broadcast',theme:'Theme',
+ ptitle_stats:'Stats',psub_stats:'How the bot is doing',ptitle_faq:'FAQ',psub_faq:'Questions users can browse',
+ ptitle_sections:'Menu sections',psub_sections:'Custom buttons on the bot menu',ptitle_settings:'Settings',psub_settings:'Welcome text and contact',
+ ptitle_broadcast:'Broadcast',psub_broadcast:'Message every user',brandsub:'Admin panel',
+ st_users:'Users',st_active:'Active (7d)',st_installs:'Panels built',st_builders:'Builders',
+ faq_add:'Add a question',faq_add_d:'Shown as a tappable list in the bot. Answers support <b> <i> <a> <code>.',f_q:'Question',f_a:'Answer',order:'Order',add:'Add question',
+ sec_add:'Add a menu section',sec_add_d:"Adds a button to the bot's main menu with your text and an optional link.",s_t:'Button title',s_b:'Body (HTML allowed)',s_bt:'Link button text (optional)',s_bu:'Link URL (optional)',add_sec:'Add section',
+ welcome:'Welcome message',welcome_d:'Shown at the top of the main menu. Leave blank for the default. Set each language separately.',save:'Save',
+ contact:'Contact us',c_enable:'Enable "Contact us"',c_group:'Admin group chat ID',c_group_d:'Create a Telegram group, add <b>@IRNovaProxy_Bot</b> as an admin, send <code>/id</code> in the group, and paste the ID here. Reply to a forwarded message to answer that user.',show_faq:'Show FAQ in menu',
+ bc:'Broadcast',bc_d:'Send a message to everyone who has used the bot. HTML allowed. Sends in the background.',bc_send:'Send to all users',
+ edit:'Edit',hide:'Hide',show:'Show',del:'Delete',hidden:'hidden',none_faq:'No questions yet.',none_sec:'No sections yet.',
+ saved:'Saved',added:'Added',deleted:'Deleted',sending:'Sending to',fill:'Please fill the fields',confirm_del:'Delete this?',confirm_bc:'Send to all users?'},
+fa:{manage:'مدیریت',stats:'آمار',faq:'سؤالات',sections:'بخش‌ها',settings:'تنظیمات',broadcast:'همگانی',theme:'پوسته',
+ ptitle_stats:'آمار',psub_stats:'وضعیت ربات',ptitle_faq:'سؤالات متداول',psub_faq:'سؤال‌هایی که کاربران می‌بینند',
+ ptitle_sections:'بخش‌های منو',psub_sections:'دکمه‌های سفارشی منوی ربات',ptitle_settings:'تنظیمات',psub_settings:'متن خوش‌آمد و تماس',
+ ptitle_broadcast:'پیام همگانی',psub_broadcast:'ارسال به همهٔ کاربران',brandsub:'پنل مدیریت',
+ st_users:'کاربران',st_active:'فعال (۷ روز)',st_installs:'پنل ساخته‌شده',st_builders:'سازندگان',
+ faq_add:'افزودن سؤال',faq_add_d:'به‌صورت فهرست قابل‌لمس در ربات نشان داده می‌شود. پاسخ‌ها از <b> <i> <a> <code> پشتیبانی می‌کنند.',f_q:'سؤال',f_a:'پاسخ',order:'ترتیب',add:'افزودن سؤال',
+ sec_add:'افزودن بخش منو',sec_add_d:'یک دکمه به منوی اصلی ربات با متن شما و یک لینک اختیاری اضافه می‌کند.',s_t:'عنوان دکمه',s_b:'متن (HTML مجاز)',s_bt:'متن دکمهٔ لینک (اختیاری)',s_bu:'آدرس لینک (اختیاری)',add_sec:'افزودن بخش',
+ welcome:'پیام خوش‌آمد',welcome_d:'بالای منوی اصلی نشان داده می‌شود. برای پیش‌فرض خالی بگذار. هر زبان را جدا تنظیم کن.',save:'ذخیره',
+ contact:'تماس با ما',c_enable:'فعال‌سازی «تماس با ما»',c_group:'آیدی گروه ادمین',c_group_d:'یک گروه تلگرام بساز، <b>@IRNovaProxy_Bot</b> را ادمین کن، در گروه <code>/id</code> بفرست و آیدی را اینجا بچسبان. برای پاسخ به کاربر، روی پیام فوروارد‌شده ریپلای کن.',show_faq:'نمایش سؤالات در منو',
+ bc:'پیام همگانی',bc_d:'به همهٔ کسانی که از ربات استفاده کرده‌اند پیام بفرست. HTML مجاز است. در پس‌زمینه ارسال می‌شود.',bc_send:'ارسال به همه',
+ edit:'ویرایش',hide:'پنهان',show:'نمایش',del:'حذف',hidden:'پنهان',none_faq:'هنوز سؤالی نیست.',none_sec:'هنوز بخشی نیست.',
+ saved:'ذخیره شد',added:'اضافه شد',deleted:'حذف شد',sending:'در حال ارسال به',fill:'لطفاً فیلدها را پر کن',confirm_del:'حذف شود؟',confirm_bc:'به همهٔ کاربران ارسال شود؟'}};
+function $(i){return document.getElementById(i)}
+var lang=localStorage.getItem('nova-lang')||'en',theme=localStorage.getItem('nova-theme')||'dark',cur='stats';
+var api=(m,r,b)=>fetch('/admin/api/'+r,{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined}).then(x=>x.json());
+var esc=s=>String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+function T(k){return (I[lang]||I.en)[k]||(I.en[k]||k)}
+function toast(m){var t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1800)}
+function toggleNav(){$('app').classList.toggle('open')}
 
-async function loadStats(){const s=await api('GET','stats');document.getElementById('stats').innerHTML=
-[['Users',s.users],['Active (7d)',s.active7d],['Panels built',s.installs],['Builders',s.builders]]
-.map(([l,n])=>'<div class="stat"><div class="n">'+n+'</div><div class="l">'+l+'</div></div>').join('');}
+function applyLang(){document.documentElement.lang=lang;document.documentElement.dir=lang==='fa'?'rtl':'ltr';
+ document.querySelectorAll('[data-k]').forEach(function(el){var k=el.dataset.k;var v=T(k);if(v){if(/[<&]/.test(v))el.innerHTML=v;else el.textContent=v}});
+ $('brandsub').textContent=T('brandsub');
+ $('ptitle').textContent=T('ptitle_'+cur);$('psub').textContent=T('psub_'+cur);
+ [].forEach.call(document.querySelectorAll('#lg button'),function(b){b.classList.toggle('on',b.dataset.l===lang)});
+ rerender()}
+function applyTheme(){document.documentElement.setAttribute('data-theme',theme);$('theme').firstChild.textContent=theme==='dark'?'☀ ':'☾ '}
+function rerender(){if(cur==='stats')loadStats();if(cur==='faq')loadFaq();if(cur==='sections')loadSections()}
 
-async function loadFaq(){const list=await api('GET','faq');const el=document.getElementById('faqlist');
-el.innerHTML=list.length?'':'<p class="muted">No questions yet.</p>';
-list.forEach(f=>{const d=document.createElement('div');d.className='item';
-d.innerHTML='<div class="q">'+esc(f.question)+(f.enabled?'':' <span class="muted">(hidden)</span>')+'</div><div class="a">'+esc(f.answer)+'</div>'+
-'<div class="row" style="margin-top:10px"><button class="btn ghost sm" onclick=\\'editFaq('+f.id+')\\'>Edit</button>'+
-'<button class="btn sm '+(f.enabled?'ghost':'')+'" onclick="toggleFaq('+f.id+','+(f.enabled?0:1)+')">'+(f.enabled?'Hide':'Show')+'</button>'+
-'<button class="btn bad sm" onclick="delFaq('+f.id+')">Delete</button></div>';
-d.dataset.f=JSON.stringify(f);el.appendChild(d);});window._faq=list;}
-async function addFaq(){const q=fq.value.trim(),a=fa.value.trim();if(!q||!a)return toast('Fill both fields');
-await api('POST','faq',{question:q,answer:a,position:+fp.value||0});fq.value=fa.value='';fp.value=0;toast('Added');loadFaq();}
-function editFaq(id){const f=window._faq.find(x=>x.id===id);const q=prompt('Question:',f.question);if(q===null)return;
-const a=prompt('Answer:',f.answer);if(a===null)return;api('PUT','faq',{id,question:q,answer:a,position:f.position,enabled:f.enabled}).then(()=>{toast('Saved');loadFaq();});}
-function toggleFaq(id,en){const f=window._faq.find(x=>x.id===id);api('PUT','faq',{id,question:f.question,answer:f.answer,position:f.position,enabled:en}).then(()=>loadFaq());}
-function delFaq(id){if(!confirm('Delete this question?'))return;api('DELETE','faq',{id}).then(()=>{toast('Deleted');loadFaq();});}
+function nav(btn){cur=btn.dataset.p;document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('on'));btn.classList.add('on');
+ document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.dataset.pane===cur));
+ $('ptitle').textContent=T('ptitle_'+cur);$('psub').textContent=T('psub_'+cur);$('app').classList.remove('open');
+ if(cur==='stats')loadStats();if(cur==='faq')loadFaq();if(cur==='sections')loadSections();if(cur==='settings')loadConfig()}
 
-async function loadSections(){const list=await api('GET','sections');const el=document.getElementById('seclist');
-el.innerHTML=list.length?'':'<p class="muted">No sections yet.</p>';window._sec=list;
-list.forEach(s=>{const d=document.createElement('div');d.className='item';
-d.innerHTML='<div class="q">'+esc(s.title)+(s.enabled?'':' <span class="muted">(hidden)</span>')+'</div><div class="a">'+esc(s.body)+'</div>'+
-(s.button_url?'<div class="muted" style="margin-top:4px">🔗 '+esc(s.button_text)+' → '+esc(s.button_url)+'</div>':'')+
-'<div class="row" style="margin-top:10px"><button class="btn ghost sm" onclick="editSection('+s.id+')">Edit</button>'+
-'<button class="btn sm '+(s.enabled?'ghost':'')+'" onclick="toggleSection('+s.id+','+(s.enabled?0:1)+')">'+(s.enabled?'Hide':'Show')+'</button>'+
-'<button class="btn bad sm" onclick="delSection('+s.id+')">Delete</button></div>';el.appendChild(d);});}
-async function addSection(){const t=st.value.trim(),b=sb.value.trim();if(!t||!b)return toast('Fill title and body');
-await api('POST','sections',{title:t,body:b,button_text:sbt.value.trim(),button_url:sbu.value.trim(),position:+sp.value||0});
-st.value=sb.value=sbt.value=sbu.value='';sp.value=0;toast('Added');loadSections();}
-function editSection(id){const s=window._sec.find(x=>x.id===id);const t=prompt('Title:',s.title);if(t===null)return;
-const b=prompt('Body:',s.body);if(b===null)return;const bt=prompt('Button text (blank for none):',s.button_text||'');
-const bu=prompt('Button URL (blank for none):',s.button_url||'');
-api('PUT','sections',{id,title:t,body:b,button_text:bt||'',button_url:bu||'',position:s.position,enabled:s.enabled}).then(()=>{toast('Saved');loadSections();});}
-function toggleSection(id,en){const s=window._sec.find(x=>x.id===id);api('PUT','sections',{id,title:s.title,body:s.body,button_text:s.button_text,button_url:s.button_url,position:s.position,enabled:en}).then(()=>loadSections());}
-function delSection(id){if(!confirm('Delete this section?'))return;api('DELETE','sections',{id}).then(()=>{toast('Deleted');loadSections();});}
+$('lg').onclick=function(e){var b=e.target.closest('button');if(b){lang=b.dataset.l;localStorage.setItem('nova-lang',lang);applyLang()}};
+$('theme').onclick=function(){theme=theme==='dark'?'light':'dark';localStorage.setItem('nova-theme',theme);applyTheme()};
 
-async function loadConfig(){const c=await api('GET','config');welcome.value=c.welcome||'';
-contact_group_id.value=c.contact_group_id||'';contact_enabled.checked=c.contact_enabled!=='0';faq_enabled.checked=c.faq_enabled!=='0';}
-async function saveConfig(){await api('POST','config',{welcome:welcome.value,contact_group_id:contact_group_id.value.trim(),
-contact_enabled:contact_enabled.checked?'1':'0',faq_enabled:faq_enabled.checked?'1':'0'});toast('Saved');}
+async function loadStats(){var s=await api('GET','stats');$('stats').innerHTML=
+ [['st_users',s.users],['st_active',s.active7d],['st_installs',s.installs],['st_builders',s.builders]]
+ .map(([k,n])=>'<div class="stat"><div class="n">'+n+'</div><div class="l">'+T(k)+'</div></div>').join('')}
 
-async function broadcast(){const t=bc.value.trim();if(!t)return toast('Write a message');
-if(!confirm('Send to all users?'))return;const r=await api('POST','broadcast',{text:t});
-if(r.ok){toast('Sending to '+r.recipients+' users');bc.value='';}else toast('Error');}
+async function loadFaq(){var list=await api('GET','faq');window._faq=list;var el=$('faqlist');
+ el.innerHTML=list.length?'':'<p class="muted">'+T('none_faq')+'</p>';
+ list.forEach(function(f){var d=document.createElement('div');d.className='item';
+ d.innerHTML='<div class="q">'+esc(f.question)+(f.enabled?'':' <span class="pill off">'+T('hidden')+'</span>')+'</div><div class="a">'+esc(f.answer)+'</div>'+
+ '<div class="row" style="margin-top:11px"><button class="btn ghost sm" onclick="editFaq('+f.id+')">'+T('edit')+'</button>'+
+ '<button class="btn ghost sm" onclick="toggleFaq('+f.id+','+(f.enabled?0:1)+')">'+(f.enabled?T('hide'):T('show'))+'</button>'+
+ '<button class="btn dg sm" onclick="delFaq('+f.id+')">'+T('del')+'</button></div>';el.appendChild(d)})}
+async function addFaq(){var q=fq.value.trim(),a=fa.value.trim();if(!q||!a)return toast(T('fill'));
+ await api('POST','faq',{question:q,answer:a,position:+fp.value||0});fq.value=fa.value='';fp.value=0;toast(T('added'));loadFaq()}
+function editFaq(id){var f=window._faq.find(x=>x.id===id);var q=prompt('Question:',f.question);if(q===null)return;var a=prompt('Answer:',f.answer);if(a===null)return;
+ api('PUT','faq',{id,question:q,answer:a,position:f.position,enabled:f.enabled}).then(()=>{toast(T('saved'));loadFaq()})}
+function toggleFaq(id,en){var f=window._faq.find(x=>x.id===id);api('PUT','faq',{id,question:f.question,answer:f.answer,position:f.position,enabled:en}).then(loadFaq)}
+function delFaq(id){if(!confirm(T('confirm_del')))return;api('DELETE','faq',{id}).then(()=>{toast(T('deleted'));loadFaq()})}
 
-loadStats();
+async function loadSections(){var list=await api('GET','sections');window._sec=list;var el=$('seclist');
+ el.innerHTML=list.length?'':'<p class="muted">'+T('none_sec')+'</p>';
+ list.forEach(function(s){var d=document.createElement('div');d.className='item';
+ d.innerHTML='<div class="q">'+esc(s.title)+(s.enabled?'':' <span class="pill off">'+T('hidden')+'</span>')+'</div><div class="a">'+esc(s.body)+'</div>'+
+ (s.button_url?'<div class="meta">🔗 '+esc(s.button_text)+' → '+esc(s.button_url)+'</div>':'')+
+ '<div class="row" style="margin-top:11px"><button class="btn ghost sm" onclick="editSection('+s.id+')">'+T('edit')+'</button>'+
+ '<button class="btn ghost sm" onclick="toggleSection('+s.id+','+(s.enabled?0:1)+')">'+(s.enabled?T('hide'):T('show'))+'</button>'+
+ '<button class="btn dg sm" onclick="delSection('+s.id+')">'+T('del')+'</button></div>';el.appendChild(d)})}
+async function addSection(){var t=st.value.trim(),b=sb.value.trim();if(!t||!b)return toast(T('fill'));
+ await api('POST','sections',{title:t,body:b,button_text:sbt.value.trim(),button_url:sbu.value.trim(),position:+sp.value||0});
+ st.value=sb.value=sbt.value=sbu.value='';sp.value=0;toast(T('added'));loadSections()}
+function editSection(id){var s=window._sec.find(x=>x.id===id);var t=prompt('Title:',s.title);if(t===null)return;var b=prompt('Body:',s.body);if(b===null)return;
+ var bt=prompt('Button text:',s.button_text||'');var bu=prompt('Button URL:',s.button_url||'');
+ api('PUT','sections',{id,title:t,body:b,button_text:bt||'',button_url:bu||'',position:s.position,enabled:s.enabled}).then(()=>{toast(T('saved'));loadSections()})}
+function toggleSection(id,en){var s=window._sec.find(x=>x.id===id);api('PUT','sections',{id,title:s.title,body:s.body,button_text:s.button_text,button_url:s.button_url,position:s.position,enabled:en}).then(loadSections)}
+function delSection(id){if(!confirm(T('confirm_del')))return;api('DELETE','sections',{id}).then(()=>{toast(T('deleted'));loadSections()})}
+
+async function loadConfig(){var c=await api('GET','config');welcome_en.value=c.welcome_en||c.welcome||'';welcome_fa.value=c.welcome_fa||'';
+ contact_group_id.value=c.contact_group_id||'';contact_enabled.checked=c.contact_enabled!=='0';faq_enabled.checked=c.faq_enabled!=='0'}
+async function saveConfig(){await api('POST','config',{welcome_en:welcome_en.value,welcome_fa:welcome_fa.value,
+ contact_group_id:contact_group_id.value.trim(),contact_enabled:contact_enabled.checked?'1':'0',faq_enabled:faq_enabled.checked?'1':'0'});toast(T('saved'))}
+
+async function broadcast(){var t=bc.value.trim();if(!t)return toast(T('fill'));if(!confirm(T('confirm_bc')))return;
+ var r=await api('POST','broadcast',{text:t});if(r.ok){toast(T('sending')+' '+r.recipients);bc.value=''}else toast('Error')}
+
+applyTheme();applyLang();loadStats();
 </script></body></html>`;
