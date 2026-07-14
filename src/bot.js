@@ -146,6 +146,36 @@ async function handleCallback(cb, env) {
   const chatId = cb.message && cb.message.chat && cb.message.chat.id;
   const msgId = cb.message && cb.message.message_id;
 
+  // Reply button on a forwarded message / whois card: pop a reply box for the
+  // admin who tapped, mapped back to the same user so their next message relays.
+  if (data.startsWith("reply:")) {
+    const group = await getConfig(env, "contact_group_id", "");
+    if (!group || String(chatId) !== String(group)) return answerCb(env, cb.id);
+    await answerCb(env, cb.id);
+    const targetId = Number(data.split(":")[1]);
+    const u = await env.DB.prepare("SELECT first_name, username FROM users WHERE id = ?")
+      .bind(targetId).first();
+    const name = u ? (u.username ? "@" + u.username : (u.first_name || "user")) : "user";
+    // Mention the tapping admin so the ForceReply pops only for them (selective).
+    const a = cb.from || {};
+    const mention = a.username
+      ? "@" + esc(a.username)
+      : `<a href="tg://user?id=${a.id}">${esc(a.first_name || "admin")}</a>`;
+    const prompt =
+      `${mention}\n` +
+      `✍️ <b>Reply to ${esc(name)}</b> · پاسخ به ${esc(name)}\n` +
+      `Type your message below · پیام خود را بنویسید`;
+    const sent = await send(env, group, prompt, {
+      reply_markup: { force_reply: true, selective: true, input_field_placeholder: "Your reply · پاسخ شما" },
+    }).catch(() => null);
+    if (sent && sent.ok && sent.result) {
+      await env.DB.prepare(
+        "INSERT OR REPLACE INTO contact_map (group_msg_id, user_id) VALUES (?, ?)"
+      ).bind(sent.result.message_id, targetId).run();
+    }
+    return;
+  }
+
   // Ban / unban from the admin group (the Block button on a forwarded message).
   if (data.startsWith("ban:") || data.startsWith("unban:")) {
     const group = await getConfig(env, "contact_group_id", "");
@@ -156,10 +186,7 @@ async function handleCallback(cb, env) {
     await answerCb(env, cb.id, ban ? "User blocked" : "User unblocked");
     await tg(env, "editMessageReplyMarkup", {
       chat_id: chatId, message_id: msgId,
-      reply_markup: { inline_keyboard: [[{
-        text: ban ? "✅ Unblock user" : "🚫 Block user",
-        callback_data: `${ban ? "unban" : "ban"}:${targetId}`,
-      }]] },
+      reply_markup: contactKb(targetId, ban),
     }).catch(() => {});
     return;
   }
@@ -253,6 +280,18 @@ async function startContact(env, chatId, userId, lang) {
   return send(env, chatId, t(lang, "contact_start"));
 }
 
+// Admin-group action buttons shown under every forwarded message / whois card.
+// Labels are bilingual (EN · FA) since the group has no single language.
+function contactKb(userId, banned) {
+  return { inline_keyboard: [[
+    { text: "✍️ Reply · پاسخ", callback_data: `reply:${userId}` },
+    {
+      text: banned ? "✅ Unblock · رفع مسدودی" : "🚫 Block · مسدود",
+      callback_data: `${banned ? "unban" : "ban"}:${userId}`,
+    },
+  ]] };
+}
+
 async function forwardContact(env, from, chatId, msg, lang) {
   const group = await getConfig(env, "contact_group_id", "");
   if (!group) return send(env, chatId, t(lang, "contact_notset"));
@@ -262,8 +301,8 @@ async function forwardContact(env, from, chatId, msg, lang) {
     `✉️ <b>New message</b>\n\n` +
     `“${esc(msg.text || "")}”\n\n` +
     card.text +
-    `\n\n<i>Reply to this message to answer them.</i>`;
-  const kb = { inline_keyboard: [[{ text: "🚫 Block user", callback_data: `ban:${from.id}` }]] };
+    `\n\n<i>Tap Reply below, or reply to this message, to answer them.</i>`;
+  const kb = contactKb(from.id, false);
 
   // The message admins reply to (mapped back to the user).
   const sent = await send(env, group, header, { reply_markup: kb });
@@ -292,11 +331,7 @@ async function whois(env, msg) {
   }
   const card = await gatherUserCard(env, targetId, null);
   const banned = await isBanned(env, targetId);
-  const kb = { inline_keyboard: [[{
-    text: banned ? "✅ Unblock user" : "🚫 Block user",
-    callback_data: `${banned ? "unban" : "ban"}:${targetId}`,
-  }]] };
-  await send(env, group, card.text, { reply_markup: kb });
+  await send(env, group, card.text, { reply_markup: contactKb(targetId, banned) });
 }
 
 async function handleGroupReply(msg, env) {
