@@ -353,7 +353,9 @@ var GUIDE={en:[
   'Create a Telegram <b>group</b> for your admins and add <b>@IRNovaProxy_Bot</b> to it.',
   'In that group send <code>/id</code> — the bot replies with the group ID.',
   'Paste that ID into <b>Admin group chat ID</b> here and tap <b>Save</b>.',
-  'Now when a user taps <b>Contact us</b> and writes, it appears in your group. <b>Reply</b> to that message in the group and the bot relays your answer back to the user privately.']},
+  'Now when a user taps <b>Contact us</b> and writes, it appears in your group. <b>Reply</b> to that message in the group and the bot relays your answer back to the user privately.',
+  'Each forwarded message comes with a <b>profile card</b> — name, @username (tap to open), ID, bio, Telegram Premium, language, a rough account-age estimate from the ID, their history with your bot, and their profile photo. Handy for spotting abusive throwaway accounts.',
+  'Send <code>/whois &lt;id&gt;</code> in the group, or reply <code>/whois</code> to a forwarded message, to pull that card any time.']},
  {h:'📢 Broadcast',s:[
   'Type a message and tap <b>Send to all users</b>. It goes to everyone who has used the bot, in the background.',
   'HTML is allowed. People who blocked the bot, or who you blocked, are skipped automatically.',
@@ -393,7 +395,9 @@ fa:[
   'یک <b>گروه</b> تلگرام برای ادمین‌ها بساز و <b>@IRNovaProxy_Bot</b> را به آن اضافه کن.',
   'در آن گروه <code>/id</code> بفرست — ربات آیدی گروه را جواب می‌دهد.',
   'آن آیدی را در <b>آیدی گروه ادمین</b> همین‌جا بچسبان و <b>ذخیره</b> را بزن.',
-  'حالا وقتی کاربری <b>تماس با ما</b> را می‌زند و می‌نویسد، در گروه شما ظاهر می‌شود. در گروه به آن پیام <b>ریپلای</b> کن تا ربات جوابت را خصوصی به کاربر برساند.']},
+  'حالا وقتی کاربری <b>تماس با ما</b> را می‌زند و می‌نویسد، در گروه شما ظاهر می‌شود. در گروه به آن پیام <b>ریپلای</b> کن تا ربات جوابت را خصوصی به کاربر برساند.',
+  'هر پیام فوروارد‌شده همراه یک <b>کارت پروفایل</b> می‌آید — نام، یوزرنیم (برای باز کردن بزن)، آیدی، بیو، پرمیوم تلگرام، زبان، تخمین سنِ حساب از روی آیدی، سابقهٔ کاربر با ربات و عکس پروفایل. برای شناسایی اکانت‌های یک‌بارمصرفِ مزاحم مفید است.',
+  'برای دیدن این کارت هر وقت خواستی، در گروه <code>/whois &lt;id&gt;</code> بفرست یا روی پیام فوروارد‌شده <code>/whois</code> ریپلای کن.']},
  {h:'📢 پیام همگانی',s:[
   'یک پیام بنویس و <b>ارسال به همه</b> را بزن. در پس‌زمینه به همهٔ کاربران ربات می‌رود.',
   'HTML مجاز است. کسانی که ربات را بلاک کرده‌اند یا تو مسدودشان کرده‌ای به‌طور خودکار رد می‌شوند.',

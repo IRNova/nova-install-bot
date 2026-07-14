@@ -8,15 +8,18 @@ import {
 } from "./db.js";
 import { install, TOKEN_DEEPLINK, extractToken } from "./install.js";
 import { t, normLang } from "./i18n.js";
+import { gatherUserCard } from "./userinfo.js";
 
 export async function handleUpdate(update, env) {
   if (update.callback_query) return handleCallback(update.callback_query, env);
   const msg = update.message || update.edited_message;
   if (!msg || !msg.chat) return;
 
-  // Admin group: a reply to a forwarded contact message relays back to the user.
+  // Admin group: /whois looks a user up; a reply to a forwarded message relays
+  // back to the user.
   const contactGroup = await getConfig(env, "contact_group_id", "");
   if (contactGroup && String(msg.chat.id) === String(contactGroup)) {
+    if ((msg.text || "").toLowerCase().startsWith("/whois")) return whois(env, msg);
     return handleGroupReply(msg, env);
   }
 
@@ -253,22 +256,58 @@ async function startContact(env, chatId, userId, lang) {
 async function forwardContact(env, from, chatId, msg, lang) {
   const group = await getConfig(env, "contact_group_id", "");
   if (!group) return send(env, chatId, t(lang, "contact_notset"));
-  const uname = from.username ? `@${from.username}` : "(no username)";
+
+  const card = await gatherUserCard(env, from.id, from);
   const header =
-    `✉️ <b>New message</b>\n` +
-    `From: ${esc(from.first_name || "")} ${uname}\n` +
-    `User ID: <code>${from.id}</code> · Lang: ${lang}\n` +
-    `<i>Reply to this message to answer them.</i>\n\n` +
-    esc(msg.text || "");
-  const sent = await send(env, group, header, {
-    reply_markup: { inline_keyboard: [[{ text: "🚫 Block user", callback_data: `ban:${from.id}` }]] },
-  });
+    `✉️ <b>New message</b>\n\n` +
+    `“${esc(msg.text || "")}”\n\n` +
+    card.text +
+    `\n\n<i>Reply to this message to answer them.</i>`;
+  const kb = { inline_keyboard: [[{ text: "🚫 Block user", callback_data: `ban:${from.id}` }]] };
+
+  // The message admins reply to (mapped back to the user). Photo goes as a
+  // separate follow-up so the caption length limit never truncates the card.
+  const sent = await send(env, group, header, { reply_markup: kb });
   if (sent && sent.result && sent.result.message_id) {
     await env.DB.prepare(
       "INSERT OR REPLACE INTO contact_map (group_msg_id, user_id) VALUES (?, ?)"
     ).bind(sent.result.message_id, from.id).run();
+    if (card.photo) {
+      await tg(env, "sendPhoto", {
+        chat_id: group, photo: card.photo, caption: `📷 ${esc(from.first_name || "user")}`,
+        reply_to_message_id: sent.result.message_id,
+      }).catch(() => {});
+    }
   }
   return send(env, chatId, t(lang, "contact_sent"), { reply_markup: { inline_keyboard: [backRow(lang)] } });
+}
+
+// /whois <id> in the admin group, or /whois as a reply to a forwarded message.
+async function whois(env, msg) {
+  const group = msg.chat.id;
+  let targetId = null;
+  const parts = (msg.text || "").trim().split(/\s+/);
+  if (parts[1] && /^\d+$/.test(parts[1])) targetId = Number(parts[1]);
+  if (!targetId && msg.reply_to_message) {
+    const row = await env.DB.prepare(
+      "SELECT user_id FROM contact_map WHERE group_msg_id = ?"
+    ).bind(msg.reply_to_message.message_id).first();
+    if (row) targetId = row.user_id;
+  }
+  if (!targetId) {
+    return send(env, group, "Usage: <code>/whois &lt;user id&gt;</code>, or reply <code>/whois</code> to a forwarded message.");
+  }
+  const card = await gatherUserCard(env, targetId, null);
+  const banned = await isBanned(env, targetId);
+  const kb = { inline_keyboard: [[{
+    text: banned ? "✅ Unblock user" : "🚫 Block user",
+    callback_data: `${banned ? "unban" : "ban"}:${targetId}`,
+  }]] };
+  const sent = await send(env, group, card.text, { reply_markup: kb });
+  if (card.photo) {
+    await tg(env, "sendPhoto", { chat_id: group, photo: card.photo,
+      reply_to_message_id: sent && sent.result && sent.result.message_id }).catch(() => {});
+  }
 }
 
 async function handleGroupReply(msg, env) {
