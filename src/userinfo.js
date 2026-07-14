@@ -1,5 +1,5 @@
 // Builds an admin-facing "who is this" card for a Telegram user, using only
-// what the Bot API exposes: profile (name / username / bio / photo / premium /
+// what the Bot API exposes: profile (name / username / bio / premium /
 // language), a rough account-age estimate from the numeric id, and the user's
 // own history with this bot. No phone, IP, or identity — Telegram doesn't give
 // bots those.
@@ -42,17 +42,7 @@ export async function gatherUserCard(env, userId, from) {
     if (r && r.ok) chat = r.result || {};
   } catch {}
 
-  // 2) First profile photo, if their privacy allows it.
-  let photo = null;
-  try {
-    const p = await tg(env, "getUserProfilePhotos", { user_id: userId, limit: 1 });
-    if (p && p.ok && p.result && p.result.total_count > 0) {
-      const sizes = p.result.photos[0];
-      photo = sizes[sizes.length - 1].file_id; // largest
-    }
-  } catch {}
-
-  // 3) Our own record of them.
+  // 2) Our own record of them.
   const row = await env.DB.prepare(
     "SELECT lang, installs, banned, first_seen, last_seen FROM users WHERE id = ?"
   ).bind(userId).first();
@@ -87,5 +77,5 @@ export async function gatherUserCard(env, userId, from) {
     lines.push("With this bot: first contact");
   }
 
-  return { text: lines.filter(Boolean).join("\n"), photo };
+  return { text: lines.filter(Boolean).join("\n") };
 }

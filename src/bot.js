@@ -265,19 +265,12 @@ async function forwardContact(env, from, chatId, msg, lang) {
     `\n\n<i>Reply to this message to answer them.</i>`;
   const kb = { inline_keyboard: [[{ text: "🚫 Block user", callback_data: `ban:${from.id}` }]] };
 
-  // The message admins reply to (mapped back to the user). Photo goes as a
-  // separate follow-up so the caption length limit never truncates the card.
+  // The message admins reply to (mapped back to the user).
   const sent = await send(env, group, header, { reply_markup: kb });
   if (sent && sent.result && sent.result.message_id) {
     await env.DB.prepare(
       "INSERT OR REPLACE INTO contact_map (group_msg_id, user_id) VALUES (?, ?)"
     ).bind(sent.result.message_id, from.id).run();
-    if (card.photo) {
-      await tg(env, "sendPhoto", {
-        chat_id: group, photo: card.photo, caption: `📷 ${esc(from.first_name || "user")}`,
-        reply_to_message_id: sent.result.message_id,
-      }).catch(() => {});
-    }
   }
   return send(env, chatId, t(lang, "contact_sent"), { reply_markup: { inline_keyboard: [backRow(lang)] } });
 }
@@ -303,11 +296,7 @@ async function whois(env, msg) {
     text: banned ? "✅ Unblock user" : "🚫 Block user",
     callback_data: `${banned ? "unban" : "ban"}:${targetId}`,
   }]] };
-  const sent = await send(env, group, card.text, { reply_markup: kb });
-  if (card.photo) {
-    await tg(env, "sendPhoto", { chat_id: group, photo: card.photo,
-      reply_to_message_id: sent && sent.result && sent.result.message_id }).catch(() => {});
-  }
+  await send(env, group, card.text, { reply_markup: kb });
 }
 
 async function handleGroupReply(msg, env) {
