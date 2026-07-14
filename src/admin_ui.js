@@ -194,6 +194,7 @@ export const DASHBOARD_HTML = HEAD("Nova Bot Admin") + `<body>${THEME_BOOT}
   <button class="nav-item on" data-p="stats" onclick="nav(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="8"/><rect x="12" y="6" width="3" height="12"/><rect x="17" y="13" width="3" height="5"/></svg><span data-k="stats">Stats</span></button>
   <button class="nav-item" data-p="faq" onclick="nav(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12" y2="17"/></svg><span data-k="faq">FAQ</span></button>
   <button class="nav-item" data-p="sections" onclick="nav(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg><span data-k="sections">Sections</span></button>
+  <button class="nav-item" data-p="users" onclick="nav(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span data-k="users">Users</span></button>
   <button class="nav-item" data-p="settings" onclick="nav(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg><span data-k="settings">Settings</span></button>
   <button class="nav-item" data-p="broadcast" onclick="nav(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 11l18-8-8 18-2-8-8-2z"/></svg><span data-k="broadcast">Broadcast</span></button>
   <div class="nav-label" data-k="help">Help</div>
@@ -246,6 +247,24 @@ export const DASHBOARD_HTML = HEAD("Nova Bot Admin") + `<body>${THEME_BOOT}
    <div id="seclist"></div>
   </div>
 
+  <!-- USERS -->
+  <div class="pane" data-pane="users">
+   <div class="card">
+    <h2 data-k="u_block_id">Block by user ID</h2>
+    <div class="desc" data-k="u_block_id_d">Paste a Telegram user ID (you'll see it on messages in your contact group) to block them from the bot.</div>
+    <div class="row">
+     <input id="banid" inputmode="numeric" placeholder="123456789" style="flex:1;min-width:160px">
+     <button class="btn dg" style="margin-top:0" onclick="banById()" data-k="u_block">Block</button>
+    </div>
+   </div>
+   <div class="card">
+    <div class="row" style="margin-bottom:6px">
+     <input id="usearch" placeholder="Search name / username / ID" oninput="loadUsers()" style="flex:1">
+    </div>
+    <div id="userlist"></div>
+   </div>
+  </div>
+
   <!-- SETTINGS -->
   <div class="pane" data-pane="settings">
    <div class="card">
@@ -282,11 +301,13 @@ export const DASHBOARD_HTML = HEAD("Nova Bot Admin") + `<body>${THEME_BOOT}
 </div>
 <div class="toast" id="toast"></div>
 <script>
-var I={en:{manage:'Manage',help:'Help',guide:'Guide',stats:'Stats',faq:'FAQ',sections:'Sections',settings:'Settings',broadcast:'Broadcast',theme:'Theme',
+var I={en:{manage:'Manage',help:'Help',guide:'Guide',stats:'Stats',faq:'FAQ',sections:'Sections',users:'Users',settings:'Settings',broadcast:'Broadcast',theme:'Theme',
  ptitle_stats:'Stats',psub_stats:'How the bot is doing',ptitle_faq:'FAQ',psub_faq:'Questions users can browse',
  ptitle_sections:'Menu sections',psub_sections:'Custom buttons on the bot menu',ptitle_settings:'Settings',psub_settings:'Welcome text and contact',
- ptitle_broadcast:'Broadcast',psub_broadcast:'Message every user',ptitle_guide:'Guide',psub_guide:'How each part works',brandsub:'Admin panel',
- st_users:'Users',st_active:'Active (7d)',st_installs:'Panels built',st_builders:'Builders',
+ ptitle_broadcast:'Broadcast',psub_broadcast:'Message every user',ptitle_guide:'Guide',psub_guide:'How each part works',
+ ptitle_users:'Users',psub_users:'Block or unblock people',brandsub:'Admin panel',
+ st_users:'Users',st_active:'Active (7d)',st_installs:'Panels built',st_builders:'Builders',st_banned:'Blocked',
+ u_block_id:'Block by user ID',u_block_id_d:"Paste a Telegram user ID (you'll see it on messages in your contact group) to block them from the bot.",u_block:'Block',u_unblock:'Unblock',u_blocked:'blocked',u_none:'No users yet.',u_installs:'installs',
  faq_add:'Add a question',faq_add_d:'Shown as a tappable list in the bot. Answers support <b> <i> <a> <code>.',f_q:'Question',f_a:'Answer',order:'Order',add:'Add question',
  sec_add:'Add a menu section',sec_add_d:"Adds a button to the bot's main menu with your text and an optional link.",s_t:'Button title',s_b:'Body (HTML allowed)',s_bt:'Link button text (optional)',s_bu:'Link URL (optional)',add_sec:'Add section',
  welcome:'Welcome message',welcome_d:'Shown at the top of the main menu. Leave blank for the default. Set each language separately.',save:'Save',
@@ -294,11 +315,13 @@ var I={en:{manage:'Manage',help:'Help',guide:'Guide',stats:'Stats',faq:'FAQ',sec
  bc:'Broadcast',bc_d:'Send a message to everyone who has used the bot. HTML allowed. Sends in the background.',bc_send:'Send to all users',
  edit:'Edit',hide:'Hide',show:'Show',del:'Delete',hidden:'hidden',none_faq:'No questions yet.',none_sec:'No sections yet.',
  saved:'Saved',added:'Added',deleted:'Deleted',sending:'Sending to',fill:'Please fill the fields',confirm_del:'Delete this?',confirm_bc:'Send to all users?'},
-fa:{manage:'مدیریت',help:'راهنما',guide:'راهنما',stats:'آمار',faq:'سؤالات',sections:'بخش‌ها',settings:'تنظیمات',broadcast:'همگانی',theme:'پوسته',
+fa:{manage:'مدیریت',help:'راهنما',guide:'راهنما',stats:'آمار',faq:'سؤالات',sections:'بخش‌ها',users:'کاربران',settings:'تنظیمات',broadcast:'همگانی',theme:'پوسته',
  ptitle_stats:'آمار',psub_stats:'وضعیت ربات',ptitle_faq:'سؤالات متداول',psub_faq:'سؤال‌هایی که کاربران می‌بینند',
  ptitle_sections:'بخش‌های منو',psub_sections:'دکمه‌های سفارشی منوی ربات',ptitle_settings:'تنظیمات',psub_settings:'متن خوش‌آمد و تماس',
- ptitle_broadcast:'پیام همگانی',psub_broadcast:'ارسال به همهٔ کاربران',ptitle_guide:'راهنما',psub_guide:'هر بخش چطور کار می‌کند',brandsub:'پنل مدیریت',
- st_users:'کاربران',st_active:'فعال (۷ روز)',st_installs:'پنل ساخته‌شده',st_builders:'سازندگان',
+ ptitle_broadcast:'پیام همگانی',psub_broadcast:'ارسال به همهٔ کاربران',ptitle_guide:'راهنما',psub_guide:'هر بخش چطور کار می‌کند',
+ ptitle_users:'کاربران',psub_users:'مسدود یا آزاد کردن افراد',brandsub:'پنل مدیریت',
+ st_users:'کاربران',st_active:'فعال (۷ روز)',st_installs:'پنل ساخته‌شده',st_builders:'سازندگان',st_banned:'مسدود',
+ u_block_id:'مسدود کردن با آیدی',u_block_id_d:'آیدی عددی کاربر تلگرام را بچسبان (روی پیام‌های گروه تماس دیده می‌شود) تا از ربات مسدود شود.',u_block:'مسدود',u_unblock:'آزاد کردن',u_blocked:'مسدود',u_none:'هنوز کاربری نیست.',u_installs:'نصب',
  faq_add:'افزودن سؤال',faq_add_d:'به‌صورت فهرست قابل‌لمس در ربات نشان داده می‌شود. پاسخ‌ها از <b> <i> <a> <code> پشتیبانی می‌کنند.',f_q:'سؤال',f_a:'پاسخ',order:'ترتیب',add:'افزودن سؤال',
  sec_add:'افزودن بخش منو',sec_add_d:'یک دکمه به منوی اصلی ربات با متن شما و یک لینک اختیاری اضافه می‌کند.',s_t:'عنوان دکمه',s_b:'متن (HTML مجاز)',s_bt:'متن دکمهٔ لینک (اختیاری)',s_bu:'آدرس لینک (اختیاری)',add_sec:'افزودن بخش',
  welcome:'پیام خوش‌آمد',welcome_d:'بالای منوی اصلی نشان داده می‌شود. برای پیش‌فرض خالی بگذار. هر زبان را جدا تنظیم کن.',save:'ذخیره',
@@ -333,8 +356,13 @@ var GUIDE={en:[
   'Now when a user taps <b>Contact us</b> and writes, it appears in your group. <b>Reply</b> to that message in the group and the bot relays your answer back to the user privately.']},
  {h:'📢 Broadcast',s:[
   'Type a message and tap <b>Send to all users</b>. It goes to everyone who has used the bot, in the background.',
-  'HTML is allowed. People who blocked the bot are skipped automatically.',
+  'HTML is allowed. People who blocked the bot, or who you blocked, are skipped automatically.',
   'Tip: keep it short and useful — a new feature, an update, a new server. Overuse leads to blocks.']},
+ {h:'🚫 Users, blocking',s:[
+  'Open <b>Users</b> to see everyone, search by name / username / ID, and <b>Block</b> or <b>Unblock</b> each one.',
+  'To block someone you only know by ID, paste it into <b>Block by user ID</b> (the ID shows on every message in your contact group).',
+  'You can also tap <b>🚫 Block user</b> right on a message in the contact group.',
+  'A blocked user gets a short "no access" notice and the bot ignores everything else from them, until you unblock.']},
  {h:'🚀 How users install their panel',intro:'What a user experiences when they tap Install — good to know when you help someone:',s:[
   'They need a free <b>Cloudflare account</b> (the bot links to sign-up).',
   'They tap <b>Get my token</b>; a pre-filled Cloudflare page opens. They scroll down, <b>Continue to summary</b>, <b>Create Token</b>, and <b>Copy</b> it.',
@@ -368,8 +396,13 @@ fa:[
   'حالا وقتی کاربری <b>تماس با ما</b> را می‌زند و می‌نویسد، در گروه شما ظاهر می‌شود. در گروه به آن پیام <b>ریپلای</b> کن تا ربات جوابت را خصوصی به کاربر برساند.']},
  {h:'📢 پیام همگانی',s:[
   'یک پیام بنویس و <b>ارسال به همه</b> را بزن. در پس‌زمینه به همهٔ کاربران ربات می‌رود.',
-  'HTML مجاز است. کسانی که ربات را بلاک کرده‌اند به‌طور خودکار رد می‌شوند.',
+  'HTML مجاز است. کسانی که ربات را بلاک کرده‌اند یا تو مسدودشان کرده‌ای به‌طور خودکار رد می‌شوند.',
   'نکته: کوتاه و مفید نگه‌دار — یک قابلیت تازه، یک به‌روزرسانی، یک سرور جدید. زیاده‌روی باعث بلاک می‌شود.']},
+ {h:'🚫 کاربران و مسدودسازی',s:[
+  '<b>کاربران</b> را باز کن تا همه را ببینی، با نام / یوزرنیم / آیدی جست‌وجو کنی و هر کدام را <b>مسدود</b> یا <b>آزاد</b> کنی.',
+  'برای مسدود کردن کسی که فقط آیدی‌اش را داری، در <b>مسدود کردن با آیدی</b> بچسبانش (آیدی روی هر پیام در گروه تماس دیده می‌شود).',
+  'همچنین می‌توانی روی هر پیام در گروه تماس دکمهٔ <b>🚫 مسدود کردن</b> را بزنی.',
+  'کاربر مسدودشده یک پیام کوتاه «عدم دسترسی» می‌گیرد و ربات بقیهٔ پیام‌هایش را نادیده می‌گیرد، تا وقتی آزادش کنی.']},
  {h:'🚀 کاربران چطور پنل نصب می‌کنند',intro:'وقتی کاربری روی نصب می‌زند چه می‌بیند — برای کمک به دیگران خوب است بدانی:',s:[
   'به یک <b>حساب رایگان Cloudflare</b> نیاز دارد (ربات لینک ثبت‌نام را می‌دهد).',
   '<b>گرفتن توکن</b> را می‌زند؛ یک صفحهٔ از‌پیش‌پرشدهٔ Cloudflare باز می‌شود. پایین می‌رود، <b>Continue to summary</b>، <b>Create Token</b>، و آن را <b>Copy</b> می‌کند.',
@@ -391,7 +424,7 @@ function applyLang(){document.documentElement.lang=lang;document.documentElement
  [].forEach.call(document.querySelectorAll('#lg button'),function(b){b.classList.toggle('on',b.dataset.l===lang)});
  rerender()}
 function applyTheme(){document.documentElement.setAttribute('data-theme',theme);$('theme').firstChild.textContent=theme==='dark'?'☀ ':'☾ '}
-function rerender(){if(cur==='stats')loadStats();if(cur==='faq')loadFaq();if(cur==='sections')loadSections();if(cur==='guide')renderGuide()}
+function rerender(){if(cur==='stats')loadStats();if(cur==='faq')loadFaq();if(cur==='sections')loadSections();if(cur==='users')loadUsers();if(cur==='guide')renderGuide()}
 function renderGuide(){var g=GUIDE[lang]||GUIDE.en;$('guidebox').innerHTML=g.map(function(sec){
  var intro=sec.intro?'<div class="desc">'+sec.intro+'</div>':'';
  var steps=sec.s.map(function(line,i){return '<div class="gstep"><span class="gn">'+(i+1)+'</span><span>'+line+'</span></div>'}).join('');
@@ -401,14 +434,26 @@ function renderGuide(){var g=GUIDE[lang]||GUIDE.en;$('guidebox').innerHTML=g.map
 function nav(btn){cur=btn.dataset.p;document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('on'));btn.classList.add('on');
  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.dataset.pane===cur));
  $('ptitle').textContent=T('ptitle_'+cur);$('psub').textContent=T('psub_'+cur);$('app').classList.remove('open');
- if(cur==='stats')loadStats();if(cur==='faq')loadFaq();if(cur==='sections')loadSections();if(cur==='settings')loadConfig();if(cur==='guide')renderGuide()}
+ if(cur==='stats')loadStats();if(cur==='faq')loadFaq();if(cur==='sections')loadSections();if(cur==='users')loadUsers();if(cur==='settings')loadConfig();if(cur==='guide')renderGuide()}
 
 $('lg').onclick=function(e){var b=e.target.closest('button');if(b){lang=b.dataset.l;localStorage.setItem('nova-lang',lang);applyLang()}};
 $('theme').onclick=function(){theme=theme==='dark'?'light':'dark';localStorage.setItem('nova-theme',theme);applyTheme()};
 
 async function loadStats(){var s=await api('GET','stats');$('stats').innerHTML=
- [['st_users',s.users],['st_active',s.active7d],['st_installs',s.installs],['st_builders',s.builders]]
+ [['st_users',s.users],['st_active',s.active7d],['st_installs',s.installs],['st_builders',s.builders],['st_banned',s.banned||0]]
  .map(([k,n])=>'<div class="stat"><div class="n">'+n+'</div><div class="l">'+T(k)+'</div></div>').join('')}
+
+async function loadUsers(){var q=encodeURIComponent(($('usearch').value||'').trim());var list=await api('GET','users'+(q?('?q='+q):''));
+ window._usr=list;var el=$('userlist');el.innerHTML=list.length?'':'<p class="muted">'+T('u_none')+'</p>';
+ list.forEach(function(u){var d=document.createElement('div');d.className='item';
+ var name=esc(u.first_name||'')+(u.username?' <span class="muted">@'+esc(u.username)+'</span>':'');
+ d.innerHTML='<div class="q">'+name+(u.banned?' <span class="pill off">'+T('u_blocked')+'</span>':'')+'</div>'+
+ '<div class="meta">ID <code>'+u.id+'</code> · '+(u.installs||0)+' '+T('u_installs')+' · '+esc((u.last_seen||'').slice(0,10))+'</div>'+
+ '<div class="row" style="margin-top:11px"><button class="btn '+(u.banned?'ghost':'dg')+' sm" onclick="setBan('+u.id+','+(u.banned?0:1)+')">'+(u.banned?T('u_unblock'):T('u_block'))+'</button></div>';
+ el.appendChild(d)})}
+async function setBan(id,banned){await api('POST','users',{id,banned:!!banned});toast(T('saved'));loadUsers()}
+async function banById(){var v=($('banid').value||'').trim().replace(/[^0-9]/g,'');if(!v)return toast(T('fill'));
+ await api('POST','users',{id:+v,banned:true});$('banid').value='';toast(T('saved'));loadUsers()}
 
 async function loadFaq(){var list=await api('GET','faq');window._faq=list;var el=$('faqlist');
  el.innerHTML=list.length?'':'<p class="muted">'+T('none_faq')+'</p>';

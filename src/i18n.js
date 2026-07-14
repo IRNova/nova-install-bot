@@ -77,6 +77,7 @@ export const STR = {
     reply_prefix: "💬 <b>Reply from the Nova team:</b>",
 
     nudge: "Send /install to set up your Nova panel, or paste your Cloudflare token when you have it.",
+    banned: "🚫 You no longer have access to this bot.",
   },
 
   fa: {
@@ -149,6 +150,7 @@ export const STR = {
     reply_prefix: "💬 <b>پاسخ از تیم نوا:</b>",
 
     nudge: "برای ساخت پنل نوا /install را بفرست، یا وقتی توکن Cloudflare را داشتی همین‌جا بچسبان.",
+    banned: "🚫 دیگر به این ربات دسترسی نداری.",
   },
 };
 

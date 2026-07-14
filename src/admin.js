@@ -2,7 +2,7 @@
 // All routes live under /admin. Auth = an HMAC-signed cookie keyed on ADMIN_PASSWORD.
 
 import { tg, send } from "./telegram.js";
-import { getConfig, setConfig, listFaq, listSections, stats, markBlocked } from "./db.js";
+import { getConfig, setConfig, listFaq, listSections, stats, markBlocked, listUsers, setBanned } from "./db.js";
 import { DASHBOARD_HTML, LOGIN_HTML } from "./admin_ui.js";
 
 const COOKIE = "nova_admin";
@@ -98,6 +98,18 @@ async function handleApi(request, env, ctx, res, method) {
     return json(await stats(env));
   }
 
+  // ── users / ban ──
+  if (res === "users" && method === "GET") {
+    const url = new URL(request.url);
+    return json(await listUsers(env, { search: (url.searchParams.get("q") || "").trim() }));
+  }
+  if (res === "users" && method === "POST") {
+    const id = Number(body.id);
+    if (!id) return json({ error: "bad id" }, 400);
+    await setBanned(env, id, !!body.banned);
+    return json({ ok: true });
+  }
+
   // ── config ──
   const CONFIG_KEYS = ["welcome", "welcome_en", "welcome_fa",
     "contact_group_id", "contact_enabled", "faq_enabled"];
@@ -157,7 +169,7 @@ async function handleApi(request, env, ctx, res, method) {
   if (res === "broadcast" && method === "POST") {
     const text = (body.text || "").trim();
     if (!text) return json({ error: "empty" }, 400);
-    const { results } = await env.DB.prepare("SELECT id FROM users WHERE blocked = 0").all();
+    const { results } = await env.DB.prepare("SELECT id FROM users WHERE blocked = 0 AND banned = 0").all();
     const ids = (results || []).map((r) => r.id);
     ctx.waitUntil(runBroadcast(env, ids, text));
     return json({ ok: true, recipients: ids.length });
