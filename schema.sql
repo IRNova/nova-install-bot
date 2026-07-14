@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS users (
   lang        TEXT DEFAULT 'en',
   installs    INTEGER DEFAULT 0,         -- panels this user built via the bot
   blocked     INTEGER DEFAULT 0,         -- 1 if the user blocked the bot (broadcast skips them)
+  banned      INTEGER DEFAULT 0,         -- 1 if an admin banned this user (can't use the bot)
   first_seen  TEXT DEFAULT (datetime('now')),
   last_seen   TEXT DEFAULT (datetime('now'))
 );

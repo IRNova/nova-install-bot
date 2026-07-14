@@ -44,6 +44,34 @@ export async function markBlocked(env, userId) {
   await env.DB.prepare("UPDATE users SET blocked = 1 WHERE id = ?").bind(userId).run();
 }
 
+// Admin ban / unban. banUser also creates a stub row if the id was never seen,
+// so an admin can pre-emptively block an id (e.g. from the contact group).
+export async function setBanned(env, userId, banned) {
+  await env.DB.prepare(
+    `INSERT INTO users (id, banned) VALUES (?, ?)
+     ON CONFLICT(id) DO UPDATE SET banned = excluded.banned`
+  ).bind(userId, banned ? 1 : 0).run();
+}
+
+export async function isBanned(env, userId) {
+  const row = await env.DB.prepare("SELECT banned FROM users WHERE id = ?").bind(userId).first();
+  return !!(row && row.banned);
+}
+
+export async function listUsers(env, { search = "", limit = 60 } = {}) {
+  let q = "SELECT id, first_name, username, lang, installs, banned, last_seen FROM users";
+  const binds = [];
+  if (search) {
+    q += " WHERE CAST(id AS TEXT) LIKE ? OR first_name LIKE ? OR username LIKE ?";
+    const like = "%" + search + "%";
+    binds.push(like, like, like);
+  }
+  q += " ORDER BY banned DESC, last_seen DESC LIMIT ?";
+  binds.push(limit);
+  const { results } = await env.DB.prepare(q).bind(...binds).all();
+  return results || [];
+}
+
 export async function listFaq(env, onlyEnabled = true) {
   const q = "SELECT * FROM faq" + (onlyEnabled ? " WHERE enabled = 1" : "") +
     " ORDER BY position ASC, id ASC";
@@ -72,7 +100,8 @@ export async function stats(env) {
     "SELECT COUNT(*) n FROM users WHERE last_seen >= datetime('now','-7 day')").first();
   const installs = await env.DB.prepare("SELECT COALESCE(SUM(installs),0) n FROM users").first();
   const builders = await env.DB.prepare("SELECT COUNT(*) n FROM users WHERE installs > 0").first();
+  const banned = await env.DB.prepare("SELECT COUNT(*) n FROM users WHERE banned = 1").first();
   return {
-    users: users.n, active7d: active.n, installs: installs.n, builders: builders.n,
+    users: users.n, active7d: active.n, installs: installs.n, builders: builders.n, banned: banned.n,
   };
 }

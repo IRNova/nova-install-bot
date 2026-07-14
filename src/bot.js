@@ -4,7 +4,7 @@
 import { tg, send, edit, answerCb, deleteMessage, esc } from "./telegram.js";
 import {
   touchUser, getConfig, setConfig, listFaq, getFaq, listSections, getSection,
-  markBlocked, getUserLang, setUserLang,
+  markBlocked, getUserLang, setUserLang, isBanned, setBanned,
 } from "./db.js";
 import { install, TOKEN_DEEPLINK, extractToken } from "./install.js";
 import { t, normLang } from "./i18n.js";
@@ -28,9 +28,16 @@ export async function handleUpdate(update, env) {
   }
 
   const from = msg.from;
-  await touchUser(env, from, normLang(from && from.language_code)).catch(() => {});
-  const lang = (await getUserLang(env, from.id)) || normLang(from && from.language_code);
   const chatId = msg.chat.id;
+  const lang0 = (await getUserLang(env, from.id)) || normLang(from && from.language_code);
+
+  // Banned users get one short notice and nothing else.
+  if (await isBanned(env, from.id)) {
+    return send(env, chatId, t(lang0, "banned"));
+  }
+
+  await touchUser(env, from, normLang(from && from.language_code)).catch(() => {});
+  const lang = lang0;
   const text = (msg.text || "").trim();
   if (!text) return;
 
@@ -135,6 +142,25 @@ async function handleCallback(cb, env) {
   const data = cb.data || "";
   const chatId = cb.message && cb.message.chat && cb.message.chat.id;
   const msgId = cb.message && cb.message.message_id;
+
+  // Ban / unban from the admin group (the Block button on a forwarded message).
+  if (data.startsWith("ban:") || data.startsWith("unban:")) {
+    const group = await getConfig(env, "contact_group_id", "");
+    if (!group || String(chatId) !== String(group)) return answerCb(env, cb.id);
+    const ban = data.startsWith("ban:");
+    const targetId = Number(data.split(":")[1]);
+    await setBanned(env, targetId, ban);
+    await answerCb(env, cb.id, ban ? "User blocked" : "User unblocked");
+    await tg(env, "editMessageReplyMarkup", {
+      chat_id: chatId, message_id: msgId,
+      reply_markup: { inline_keyboard: [[{
+        text: ban ? "✅ Unblock user" : "🚫 Block user",
+        callback_data: `${ban ? "unban" : "ban"}:${targetId}`,
+      }]] },
+    }).catch(() => {});
+    return;
+  }
+
   await touchUser(env, cb.from, normLang(cb.from && cb.from.language_code)).catch(() => {});
   const lang = (await getUserLang(env, cb.from.id)) || normLang(cb.from && cb.from.language_code);
   await answerCb(env, cb.id);
@@ -234,7 +260,9 @@ async function forwardContact(env, from, chatId, msg, lang) {
     `User ID: <code>${from.id}</code> · Lang: ${lang}\n` +
     `<i>Reply to this message to answer them.</i>\n\n` +
     esc(msg.text || "");
-  const sent = await send(env, group, header);
+  const sent = await send(env, group, header, {
+    reply_markup: { inline_keyboard: [[{ text: "🚫 Block user", callback_data: `ban:${from.id}` }]] },
+  });
   if (sent && sent.result && sent.result.message_id) {
     await env.DB.prepare(
       "INSERT OR REPLACE INTO contact_map (group_msg_id, user_id) VALUES (?, ?)"
