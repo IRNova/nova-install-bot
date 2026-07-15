@@ -175,7 +175,7 @@ export function LOGIN_HTML(failed) {
 </div></div>
 <script>
 var T={en:{t1:'Sign in to the admin panel',lpw:'Password',pw:'password',go:'Sign in',bad:'Wrong password.',bs:'Admin panel',ft:'Nova Proxy, open-source networking tools'},
-fa:{t1:'ورود به پنل مدیریت',lpw:'رمز عبور',pw:'رمز عبور',go:'ورود',bad:'رمز اشتباه است.',bs:'پنل مدیریت',ft:'نوا پروکسی، ابزار شبکه متن‌باز'}};
+fa:{t1:'ورود به پنل مدیریت',lpw:'رمز عبور',pw:'رمز عبور',go:'ورود',bad:'رمز اشتباه است.',bs:'پنل مدیریت',ft:'نوا پراکسی، ابزار شبکه متن‌باز'}};
 function $(i){return document.getElementById(i)}
 var lang=localStorage.getItem('nova-lang')||'en',theme=localStorage.getItem('nova-theme')||'dark';
 function ap(){var t=T[lang];document.documentElement.lang=lang;document.documentElement.dir=lang==='fa'?'rtl':'ltr';
@@ -406,7 +406,7 @@ var GUIDE={en:[
   'The bot returns their panel address and a button to set their admin password.']},
 ],
 fa:[
- {h:'👋 معرفی',intro:'این پنل، ربات تلگرام نوای شما را اداره می‌کند. کاربران به ربات پیام می‌دهند تا پنل پروکسی نوای رایگان خودشان را بسازند، سؤالات متداول را بخوانند و به تیم شما برسند. همه‌چیزِ زیر از همین‌جا مدیریت می‌شود و ربات فوراً به‌روز می‌شود.',s:[
+ {h:'👋 معرفی',intro:'این پنل، ربات تلگرام نوای شما را اداره می‌کند. کاربران به ربات پیام می‌دهند تا پنل پراکسی نوای رایگان خودشان را بسازند، سؤالات متداول را بخوانند و به تیم شما برسند. همه‌چیزِ زیر از همین‌جا مدیریت می‌شود و ربات فوراً به‌روز می‌شود.',s:[
   'ربات به دو زبان <b>انگلیسی و فارسی</b> کار می‌کند. هر کاربر به‌طور خودکار زبان خودش را می‌بیند و با دکمهٔ 🌐 در ربات می‌تواند عوضش کند.',
   'از کلیدهای زبان و پوستهٔ پایین همین نوار کناری استفاده کن. انتخاب تو روی این دستگاه ذخیره می‌شود.']},
  {h:'📊 آمار',s:[
