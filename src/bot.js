@@ -174,7 +174,8 @@ async function menuText(env, from, lang) {
 async function sendMenu(env, chatId, from, lang) {
   const text = await menuText(env, from, lang);
   const markup = await menuMarkup(env, lang);
-  const img = (await getConfig(env, "welcome_image", "https://novaproxy.online/og.png")).trim();
+  const img = (await getConfig(env, "welcome_image",
+    "https://nova-install-bot.bitter-flower-1b15.workers.dev/banner.jpg")).trim();
   if (img) {
     const r = await sendPhoto(env, chatId, img, text, { reply_markup: markup });
     if (r && r.ok) return r;
