@@ -488,7 +488,14 @@ async function handleContactMessage(env, from, chatId, msg, lang) {
 
   if (question && (await aiEnabled(env))) {
     await tg(env, "sendChatAction", { chat_id: chatId, action: "typing" }).catch(() => {});
-    const r = await autoAnswer(env, question, lang).catch(() => null);
+    // Hard time cap: the platform stops background work ~30s after the webhook
+    // response, so a slow model run must lose the race and fall through to the
+    // human forward instead of silently killing the whole flow.
+    const r = await Promise.race([
+      autoAnswer(env, question, lang).catch(() => null),
+      new Promise((res) => setTimeout(() => res(null), 15000)),
+    ]);
+    if (!r) console.log("ai: no confident answer in time, forwarding to humans");
     if (r && r.confident && r.answer) {
       await setQaAnswer(env, qaId, r.answer, "ai").catch(() => {});
       const kb = { inline_keyboard: [
