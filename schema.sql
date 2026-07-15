@@ -46,7 +46,22 @@ CREATE TABLE IF NOT EXISTS contact_map (
   user_id       INTEGER NOT NULL,
   card_msg_id   INTEGER,                 -- the card this row's message belongs to (self for cards)
   replied       INTEGER DEFAULT 0,       -- 1 once an admin's reply was delivered
+  qa_id         INTEGER,                 -- qa_log row this card carries (answer capture)
   created_at    TEXT DEFAULT (datetime('now'))
+);
+
+-- Every support question and its answer (human or AI). Feeds the AI
+-- auto-answer knowledge pack and the FAQ suggester.
+CREATE TABLE IF NOT EXISTS qa_log (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id     INTEGER,
+  lang        TEXT DEFAULT 'en',
+  question    TEXT NOT NULL,
+  answer      TEXT,                        -- null until answered
+  source      TEXT,                        -- 'ai' | 'human'
+  resolved    INTEGER DEFAULT 0,           -- 1 when the user tapped "Solved"
+  created_at  TEXT DEFAULT (datetime('now')),
+  answered_at TEXT
 );
 
 -- Seed default config.
@@ -59,4 +74,6 @@ INSERT OR IGNORE INTO config (key, value) VALUES
   ('join_channel', 'irnova_proxy'),
   ('support_text', ''),
   ('support_links', ''),
-  ('welcome_image', 'https://nova-install-bot.bitter-flower-1b15.workers.dev/banner.jpg');
+  ('welcome_image', 'https://nova-install-bot.bitter-flower-1b15.workers.dev/banner.jpg'),
+  ('ai_enabled', '1'),
+  ('ai_model', 'claude-opus-4-8');

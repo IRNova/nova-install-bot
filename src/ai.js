@@ -1,0 +1,192 @@
+// AI support: auto-answer user questions from a knowledge pack (Nova reference
+// doc + FAQ + past human answers), and draft FAQ entries from real questions.
+//
+// Secret (wrangler secret put): ANTHROPIC_API_KEY. Without it every entry
+// point here reports "disabled" and the bot falls back to human support.
+
+import Anthropic from "@anthropic-ai/sdk";
+import { getConfig, listFaq, listAnsweredQa } from "./db.js";
+
+export async function aiEnabled(env) {
+  if (!env.ANTHROPIC_API_KEY) return false;
+  return (await getConfig(env, "ai_enabled", "1")) === "1";
+}
+
+function client(env) {
+  return new Anthropic({ apiKey: env.ANTHROPIC_API_KEY, maxRetries: 1, timeout: 90_000 });
+}
+
+async function model(env) {
+  return (await getConfig(env, "ai_model", "claude-opus-4-8")).trim() || "claude-opus-4-8";
+}
+
+// Static reference about Nova. Kept compact on purpose: this plus the FAQ and
+// past answers is the ONLY thing the assistant may answer from.
+const NOVA_REFERENCE = `
+Nova Proxy is a free, self-hosted proxy panel that runs on the user's own free
+Cloudflare account (Worker + D1 + KV). It is built for high-censorship networks
+like Iran. There is no shared server; each user owns their panel, domain and data.
+
+This Telegram bot (@IRNovaProxy_Bot) can:
+- Build a new panel: the user taps "Get my token", creates a pre-filled
+  Cloudflare API token, and pastes it in the chat. The bot deletes the token
+  message immediately, never stores it, and builds the panel in about a minute.
+- Update an existing panel to the latest Nova version: same token flow, then
+  the user picks their Worker from a list. Settings, users and data are kept.
+
+Common issues and facts:
+- The token must be created with the pre-filled Cloudflare Workers template and
+  copied in full (one line, 40 characters, no spaces). It is shown only once.
+  Copy the API Token, not the Global API Key and not the account email.
+- In Iran, cloudflare.com and workers.dev are filtered. To create the token the
+  user should turn on their current VPN first. To use the panel long-term they
+  should add a Custom Domain in Cloudflare (Workers -> their worker ->
+  Settings -> Domains & Routes) because workers.dev is blocked.
+- A new panel address can take 1-3 minutes to go live worldwide; if the link
+  errors at first, wait a minute and refresh.
+- After install, the user must set their admin password using the button the
+  bot sends, then open the panel, create users, and import the subscription
+  link into a client app.
+- Subscription links work as Auto, Base64, or Clash format and import into most
+  apps (Nova Client, v2rayNG, Clash Meta, FlClash, Karing).
+- Recommended client: Nova Client. Android APK:
+  https://github.com/IRNova/Nova-Client/releases/latest/download/nova-client.apk
+  All platforms: https://github.com/IRNova/Nova-Client/releases
+- Voice/video calls (WhatsApp, Telegram, FaceTime) use UDP which a plain free
+  Worker cannot carry; the user should enable the WARP node or a backend server
+  in their panel settings.
+- The panel source: https://github.com/IRNova/Nova-Proxy
+  Official channel: https://t.me/irnova_proxy
+- Everything is free. Nova never sells subscriptions.
+`;
+
+const ANSWER_SCHEMA = {
+  type: "object",
+  properties: {
+    confident: {
+      type: "boolean",
+      description: "true only if the knowledge pack clearly covers the question and the answer is safe to send without a human",
+    },
+    answer: { type: "string", description: "The reply to send to the user, in their language" },
+  },
+  required: ["confident", "answer"],
+  additionalProperties: false,
+};
+
+async function knowledgePack(env) {
+  const faq = await listFaq(env).catch(() => []);
+  const humanQa = await listAnsweredQa(env, { source: "human", limit: 40 }).catch(() => []);
+  let kb = NOVA_REFERENCE;
+  if (faq.length) {
+    kb += "\n\nOfficial FAQ entries:\n" +
+      faq.map((f) => `Q: ${f.question}\nA: ${f.answer}`).join("\n---\n");
+  }
+  if (humanQa.length) {
+    kb += "\n\nPast questions answered by the human support team (gold standard):\n" +
+      humanQa.map((r) => `Q: ${r.question}\nA: ${r.answer}`).join("\n---\n");
+  }
+  return kb;
+}
+
+// Try to answer a support question. Returns {confident, answer} or null on any
+// failure (caller falls back to human support).
+export async function autoAnswer(env, question, lang) {
+  const kb = await knowledgePack(env);
+  const language = lang === "fa" ? "Persian (Farsi)" : lang === "ru" ? "Russian" : "English";
+  const response = await client(env).messages.create({
+    model: await model(env),
+    max_tokens: 1024,
+    output_config: { effort: "low", format: { type: "json_schema", schema: ANSWER_SCHEMA } },
+    system: [
+      {
+        type: "text",
+        text:
+          "You are the support assistant for the Nova Proxy Telegram bot. " +
+          "Answer ONLY from the knowledge pack below. Rules:\n" +
+          "- Set confident=false when the question is not clearly covered, involves account " +
+          "security, payments, lost data, legal topics, a bug report, or an angry/frustrated user. " +
+          "A human will take over; do not guess.\n" +
+          "- Never invent URLs, commands, or facts. Only use links that appear in the knowledge pack.\n" +
+          "- Never ask the user to share their Cloudflare token, password, or subscription link in chat " +
+          "beyond what the bot's own install/update flow does.\n" +
+          "- Keep answers under 900 characters, friendly and concrete. Telegram HTML only: " +
+          "<b>, <i>, <code>, <a href>. No markdown.\n" +
+          "- If the user should use a bot feature, name the exact button (for example the install " +
+          "or update button on the /start menu).\n\n" +
+          "KNOWLEDGE PACK:\n" + kb,
+        cache_control: { type: "ephemeral" },
+      },
+    ],
+    messages: [
+      { role: "user", content: `User language: ${language}. Reply in that language.\n\nQuestion:\n${question}` },
+    ],
+  });
+  if (response.stop_reason === "refusal") return null;
+  const text = response.content.find((b) => b.type === "text");
+  if (!text || !text.text) return null;
+  const out = JSON.parse(text.text);
+  if (typeof out.confident !== "boolean" || typeof out.answer !== "string") return null;
+  return out;
+}
+
+const FAQ_SCHEMA = {
+  type: "object",
+  properties: {
+    faqs: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          question: { type: "string" },
+          answer: { type: "string" },
+        },
+        required: ["question", "answer"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["faqs"],
+  additionalProperties: false,
+};
+
+// Draft new FAQ entries from recent real questions. Inserts them DISABLED so
+// the admin reviews and enables them in the panel. Returns the drafts.
+export async function suggestFaqs(env) {
+  const recent = await listAnsweredQa(env, { limit: 100 });
+  if (!recent.length) return [];
+  const existing = await listFaq(env, false).catch(() => []);
+  const response = await client(env).messages.create({
+    model: await model(env),
+    max_tokens: 4096,
+    output_config: { format: { type: "json_schema", schema: FAQ_SCHEMA } },
+    system:
+      "You maintain the FAQ of the Nova Proxy support bot (a free self-hosted proxy panel " +
+      "for censored networks). From the real support exchanges provided, draft NEW FAQ entries:\n" +
+      "- Only recurring or clearly useful questions; merge duplicates into one entry.\n" +
+      "- Skip anything already covered by the existing FAQ list.\n" +
+      "- Write each entry in the language its users asked in (mostly Persian). Keep the question " +
+      "short and the answer complete but tight. Telegram HTML only: <b>, <i>, <code>, <a href>.\n" +
+      "- Prefer answers the human team gave; never invent facts or links.\n" +
+      "- Return at most 6 entries. Return an empty list if nothing new is worth adding.",
+    messages: [
+      {
+        role: "user",
+        content:
+          "Existing FAQ questions (do not duplicate):\n" +
+          (existing.map((f) => "- " + f.question).join("\n") || "(none)") +
+          "\n\nRecent support exchanges (Q = user, A = answer, [ai] = answered by the assistant):\n" +
+          recent.map((r) => `Q: ${r.question}\nA${r.source === "ai" ? " [ai]" : ""}: ${r.answer}`).join("\n---\n"),
+      },
+    ],
+  });
+  const text = response.content.find((b) => b.type === "text");
+  if (!text || !text.text) return [];
+  const out = JSON.parse(text.text);
+  const drafts = Array.isArray(out.faqs) ? out.faqs.filter((f) => f.question && f.answer) : [];
+  for (const f of drafts) {
+    await env.DB.prepare(
+      "INSERT INTO faq (question, answer, position, enabled) VALUES (?, ?, 999, 0)"
+    ).bind(f.question.slice(0, 300), f.answer.slice(0, 3500)).run();
+  }
+  return drafts;
+}

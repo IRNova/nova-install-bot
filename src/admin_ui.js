@@ -1,4 +1,4 @@
-// Admin panel HTML — Nova brand design system (tokens copied from the production
+// Admin panel HTML, Nova brand design system (tokens copied from the production
 // Nova panel), Inter + Vazirmatn, light/dark, English + Persian with RTL,
 // enterprise sidebar layout. Shipped inline so the whole bot is one Worker.
 
@@ -230,6 +230,11 @@ export const DASHBOARD_HTML = HEAD("Nova Bot Admin") + `<body>${THEME_BOOT}
     <label data-k="order">Order</label><input id="fp" type="number" value="0" style="max-width:120px">
     <button class="btn" onclick="addFaq()" data-k="add">Add question</button>
    </div>
+   <div class="card">
+    <h2 data-k="faq_ai">Draft from real questions</h2>
+    <div class="desc" data-k="faq_ai_d">The AI reads recent support questions and your team's answers, then drafts new FAQ entries. Drafts appear below as hidden; review, edit and Show the good ones.</div>
+    <button class="btn ghost" style="margin-top:0" onclick="suggestFaq(this)" data-k="faq_ai_btn">✨ Suggest FAQ entries</button>
+   </div>
    <div id="faqlist"></div>
   </div>
 
@@ -299,6 +304,15 @@ export const DASHBOARD_HTML = HEAD("Nova Bot Admin") + `<body>${THEME_BOOT}
     <div><button class="btn" onclick="saveConfig()" data-k="save">Save</button></div>
    </div>
    <div class="card">
+    <h2 data-k="ai">AI assistant</h2>
+    <div class="desc" data-k="ai_d">Answers support messages automatically when it is confident, using your FAQ and your team's past answers. Everything else still goes to your admin group, and every AI answer is copied there for review.</div>
+    <label class="switch"><input type="checkbox" id="ai_enabled"> <span data-k="ai_enable">Auto-answer support questions</span></label>
+    <label data-k="ai_model_l">Model</label>
+    <input id="ai_model" dir="ltr" placeholder="claude-opus-4-8">
+    <div class="desc" style="margin-top:8px" data-k="ai_key_d">Needs the <code>ANTHROPIC_API_KEY</code> secret on the Worker: <code>wrangler secret put ANTHROPIC_API_KEY</code>. Without it, the bot quietly falls back to human support.</div>
+    <div><button class="btn" onclick="saveConfig()" data-k="save">Save</button></div>
+   </div>
+   <div class="card">
     <h2 data-k="contact">Contact us</h2>
     <label class="switch"><input type="checkbox" id="contact_enabled"> <span data-k="c_enable">Enable "Contact us"</span></label>
     <label data-k="c_group">Admin group chat ID</label>
@@ -330,7 +344,9 @@ var I={en:{manage:'Manage',help:'Help',guide:'Guide',stats:'Stats',faq:'FAQ',sec
  ptitle_sections:'Menu sections',psub_sections:'Custom buttons on the bot menu',ptitle_settings:'Settings',psub_settings:'Welcome text and contact',
  ptitle_broadcast:'Broadcast',psub_broadcast:'Message every user',ptitle_guide:'Guide',psub_guide:'How each part works',
  ptitle_users:'Users',psub_users:'Block or unblock people',brandsub:'Admin panel',
- st_users:'Users',st_active:'Active (7d)',st_installs:'Panels built',st_builders:'Builders',st_banned:'Blocked',
+ st_users:'Users',st_active:'Active (7d)',st_installs:'Panels built',st_builders:'Builders',st_banned:'Blocked',st_qa:'Questions',st_ai:'AI answered',
+ faq_ai:'Draft from real questions',faq_ai_d:"The AI reads recent support questions and your team's answers, then drafts new FAQ entries. Drafts appear below as hidden; review, edit and Show the good ones.",faq_ai_btn:'✨ Suggest FAQ entries',faq_ai_done:'Drafts added:',faq_ai_nokey:'Set the ANTHROPIC_API_KEY secret first',
+ ai:'AI assistant',ai_d:"Answers support messages automatically when it is confident, using your FAQ and your team's past answers. Everything else still goes to your admin group, and every AI answer is copied there for review.",ai_enable:'Auto-answer support questions',ai_model_l:'Model',ai_key_d:'Needs the <code>ANTHROPIC_API_KEY</code> secret on the Worker: <code>wrangler secret put ANTHROPIC_API_KEY</code>. Without it, the bot quietly falls back to human support.',
  u_block_id:'Block by user ID',u_block_id_d:"Paste a Telegram user ID (you'll see it on messages in your contact group) to block them from the bot.",u_block:'Block',u_unblock:'Unblock',u_blocked:'blocked',u_none:'No users yet.',u_installs:'installs',
  faq_add:'Add a question',faq_add_d:'Shown as a tappable list in the bot. Answers support <b> <i> <a> <code>.',f_q:'Question',f_a:'Answer',order:'Order',add:'Add question',
  sec_add:'Add a menu section',sec_add_d:"Adds a button to the bot's main menu with your text and an optional link.",s_t:'Button title',s_b:'Body (HTML allowed)',s_bt:'Link button text (optional)',s_bu:'Link URL (optional)',add_sec:'Add section',
@@ -347,7 +363,9 @@ fa:{manage:'مدیریت',help:'راهنما',guide:'راهنما',stats:'آما
  ptitle_sections:'بخش‌های منو',psub_sections:'دکمه‌های سفارشی منوی ربات',ptitle_settings:'تنظیمات',psub_settings:'متن خوش‌آمد و تماس',
  ptitle_broadcast:'پیام همگانی',psub_broadcast:'ارسال به همهٔ کاربران',ptitle_guide:'راهنما',psub_guide:'هر بخش چطور کار می‌کند',
  ptitle_users:'کاربران',psub_users:'مسدود یا آزاد کردن افراد',brandsub:'پنل مدیریت',
- st_users:'کاربران',st_active:'فعال (۷ روز)',st_installs:'پنل ساخته‌شده',st_builders:'سازندگان',st_banned:'مسدود',
+ st_users:'کاربران',st_active:'فعال (۷ روز)',st_installs:'پنل ساخته‌شده',st_builders:'سازندگان',st_banned:'مسدود',st_qa:'سؤال‌ها',st_ai:'پاسخ هوش مصنوعی',
+ faq_ai:'پیش‌نویس از سؤال‌های واقعی',faq_ai_d:'هوش مصنوعی سؤال‌های اخیر کاربران و پاسخ‌های تیمت را می‌خواند و سؤال‌های متداول جدید پیش‌نویس می‌کند. پیش‌نویس‌ها پایین به‌صورت پنهان ظاهر می‌شوند؛ بازبینی و ویرایش کن و خوب‌ها را نمایش بده.',faq_ai_btn:'✨ پیشنهاد سؤالات متداول',faq_ai_done:'پیش‌نویس اضافه شد:',faq_ai_nokey:'اول سکرت ANTHROPIC_API_KEY را تنظیم کن',
+ ai:'دستیار هوش مصنوعی',ai_d:'وقتی مطمئن باشد، با استفاده از سؤالات متداول و پاسخ‌های قبلی تیمت، به پیام‌های پشتیبانی خودکار جواب می‌دهد. بقیه مثل قبل به گروه ادمین می‌رود و هر پاسخ هوش مصنوعی هم برای بازبینی همان‌جا کپی می‌شود.',ai_enable:'پاسخ خودکار به سؤال‌های پشتیبانی',ai_model_l:'مدل',ai_key_d:'به سکرت <code>ANTHROPIC_API_KEY</code> روی ورکر نیاز دارد: <code>wrangler secret put ANTHROPIC_API_KEY</code>. بدون آن، ربات بی‌سروصدا به پشتیبانی انسانی برمی‌گردد.',
  u_block_id:'مسدود کردن با آیدی',u_block_id_d:'آیدی عددی کاربر تلگرام را بچسبان (روی پیام‌های گروه تماس دیده می‌شود) تا از ربات مسدود شود.',u_block:'مسدود',u_unblock:'آزاد کردن',u_blocked:'مسدود',u_none:'هنوز کاربری نیست.',u_installs:'نصب',
  faq_add:'افزودن سؤال',faq_add_d:'به‌صورت فهرست قابل‌لمس در ربات نشان داده می‌شود. پاسخ‌ها از <b> <i> <a> <code> پشتیبانی می‌کنند.',f_q:'سؤال',f_a:'پاسخ',order:'ترتیب',add:'افزودن سؤال',
  sec_add:'افزودن بخش منو',sec_add_d:'یک دکمه به منوی اصلی ربات با متن شما و یک لینک اختیاری اضافه می‌کند.',s_t:'عنوان دکمه',s_b:'متن (HTML مجاز)',s_bt:'متن دکمهٔ لینک (اختیاری)',s_bu:'آدرس لینک (اختیاری)',add_sec:'افزودن بخش',
@@ -364,24 +382,24 @@ var GUIDE={en:[
   'The bot works in <b>English and Persian</b>. Each user sees their own language automatically, and can switch it with the 🌐 button in the bot.',
   'Use the language and theme switches at the bottom of this sidebar. Your choice is remembered on this device.']},
  {h:'📊 Stats',s:[
-  '<b>Users</b> — everyone who has ever opened the bot.',
-  '<b>Active (7d)</b> — users who used it in the last 7 days.',
-  '<b>Panels built</b> — how many Nova panels were installed through the bot.',
-  '<b>Builders</b> — how many different users built at least one panel.']},
+  '<b>Users</b>: everyone who has ever opened the bot.',
+  '<b>Active (7d)</b>: users who used it in the last 7 days.',
+  '<b>Panels built</b>: how many Nova panels were installed through the bot.',
+  '<b>Builders</b>: how many different users built at least one panel.']},
  {h:'❓ FAQ',s:[
   'Add a <b>Question</b> and its <b>Answer</b>, then tap <b>Add question</b>. It appears in the bot under the FAQ button.',
   'Answers accept simple HTML: <code>&lt;b&gt;bold&lt;/b&gt;</code>, <code>&lt;i&gt;italic&lt;/i&gt;</code>, <code>&lt;a href="…"&gt;link&lt;/a&gt;</code>, <code>&lt;code&gt;</code>.',
   '<b>Order</b> sets the position (lower shows first). <b>Hide</b> keeps an entry without showing it; <b>Delete</b> removes it.']},
  {h:'🧩 Sections',s:[
-  'Sections are your own buttons on the bot menu — a user guide, a channel, rules, anything.',
+  'Sections are your own buttons on the bot menu, a user guide, a channel, rules, anything.',
   'Give a <b>Button title</b> (shown on the menu), a <b>Body</b> (the message when tapped, HTML allowed), and optionally a <b>link button</b> (text + URL).',
-  'This is the place to add your own <b>how-to guides for users</b> in each language — create one section in English and one in Persian.']},
- {h:'⚙️ Settings — Welcome',s:[
+  'This is the place to add your own <b>how-to guides for users</b> in each language, create one section in English and one in Persian.']},
+ {h:'⚙️ Settings, Welcome',s:[
   'The <b>Welcome message</b> shows at the top of the bot menu. Set the <b>English</b> and <b>فارسی</b> boxes separately; leave a box blank to use the built-in default.']},
- {h:'✉️ Settings — Contact setup',intro:'Let users message your team from the bot. One-time setup:',s:[
+ {h:'✉️ Settings, Contact setup',intro:'Let users message your team from the bot. One-time setup:',s:[
   'In <b>@BotFather</b> send <code>/setprivacy</code>, choose your bot, and tap <b>Disable</b> (so the bot can read admin replies in the group).',
   'Create a Telegram <b>group</b> for your admins and add <b>@IRNovaProxy_Bot</b> to it.',
-  'In that group send <code>/id</code> — the bot replies with the group ID.',
+  'In that group send <code>/id</code>, the bot replies with the group ID.',
   'Paste that ID into <b>Admin group chat ID</b> here and tap <b>Save</b>.',
   'Now when a user taps <b>Contact us</b> and writes, it appears in your group. <b>Reply</b> to that message in the group and the bot relays your answer back to the user privately.',
   'Each forwarded message shows a compact card: <b>name, @username and numeric ID</b>. Once your reply is delivered, the Reply button turns green and reads <b>Replied</b>, so you can see which messages are handled.',
@@ -393,13 +411,13 @@ var GUIDE={en:[
  {h:'📢 Broadcast',s:[
   'Type a message and tap <b>Send to all users</b>. It goes to everyone who has used the bot, in the background.',
   'HTML is allowed. People who blocked the bot, or who you blocked, are skipped automatically.',
-  'Tip: keep it short and useful — a new feature, an update, a new server. Overuse leads to blocks.']},
+  'Tip: keep it short and useful, a new feature, an update, a new server. Overuse leads to blocks.']},
  {h:'🚫 Users, blocking',s:[
   'Open <b>Users</b> to see everyone, search by name / username / ID, and <b>Block</b> or <b>Unblock</b> each one.',
   'To block someone you only know by ID, paste it into <b>Block by user ID</b> (the ID shows on every message in your contact group).',
   'You can also tap <b>🚫 Block user</b> right on a message in the contact group.',
   'A blocked user gets a short "no access" notice and the bot ignores everything else from them, until you unblock.']},
- {h:'🚀 How users install their panel',intro:'What a user experiences when they tap Install — good to know when you help someone:',s:[
+ {h:'🚀 How users install their panel',intro:'What a user experiences when they tap Install, good to know when you help someone:',s:[
   'They need a free <b>Cloudflare account</b> (the bot links to sign-up).',
   'They tap <b>Get my token</b>; a pre-filled Cloudflare page opens. They scroll down, <b>Continue to summary</b>, <b>Create Token</b>, and <b>Copy</b> it.',
   'They paste the token into the chat. The bot <b>deletes it instantly</b> and never stores it, then builds the panel on their own account (~1 min).',
@@ -410,24 +428,24 @@ fa:[
   'ربات به دو زبان <b>انگلیسی و فارسی</b> کار می‌کند. هر کاربر به‌طور خودکار زبان خودش را می‌بیند و با دکمهٔ 🌐 در ربات می‌تواند عوضش کند.',
   'از کلیدهای زبان و پوستهٔ پایین همین نوار کناری استفاده کن. انتخاب تو روی این دستگاه ذخیره می‌شود.']},
  {h:'📊 آمار',s:[
-  '<b>کاربران</b> — همهٔ کسانی که تا حالا ربات را باز کرده‌اند.',
-  '<b>فعال (۷ روز)</b> — کاربرانی که در ۷ روز گذشته استفاده کرده‌اند.',
-  '<b>پنل ساخته‌شده</b> — چند پنل نوا از طریق ربات نصب شده است.',
-  '<b>سازندگان</b> — چند کاربر متفاوت دست‌کم یک پنل ساخته‌اند.']},
+  '<b>کاربران</b>: همهٔ کسانی که تا حالا ربات را باز کرده‌اند.',
+  '<b>فعال (۷ روز)</b>: کاربرانی که در ۷ روز گذشته استفاده کرده‌اند.',
+  '<b>پنل ساخته‌شده</b>: چند پنل نوا از طریق ربات نصب شده است.',
+  '<b>سازندگان</b>: چند کاربر متفاوت دست‌کم یک پنل ساخته‌اند.']},
  {h:'❓ سؤالات متداول',s:[
   'یک <b>سؤال</b> و <b>پاسخ</b> آن را وارد کن و <b>افزودن سؤال</b> را بزن. زیر دکمهٔ سؤالات در ربات ظاهر می‌شود.',
   'پاسخ‌ها از HTML ساده پشتیبانی می‌کنند: <code>&lt;b&gt;پررنگ&lt;/b&gt;</code>، <code>&lt;i&gt;مورب&lt;/i&gt;</code>، <code>&lt;a href="…"&gt;لینک&lt;/a&gt;</code>، <code>&lt;code&gt;</code>.',
   '<b>ترتیب</b> جای نمایش را تعیین می‌کند (کوچک‌تر اول). <b>پنهان</b> سؤال را نگه می‌دارد ولی نشان نمی‌دهد؛ <b>حذف</b> پاکش می‌کند.']},
  {h:'🧩 بخش‌ها',s:[
-  'بخش‌ها دکمه‌های اختصاصی تو در منوی ربات هستند — راهنمای کاربر، کانال، قوانین، هر چیزی.',
+  'بخش‌ها دکمه‌های اختصاصی تو در منوی ربات هستند، راهنمای کاربر، کانال، قوانین، هر چیزی.',
   'یک <b>عنوان دکمه</b> (روی منو)، یک <b>متن</b> (پیامی که با زدنش نشان داده می‌شود، HTML مجاز) و به‌دلخواه یک <b>دکمهٔ لینک</b> (متن + آدرس) بده.',
-  'اینجا بهترین جا برای افزودن <b>راهنمای کاربران</b> به هر زبان است — یک بخش انگلیسی و یک بخش فارسی بساز.']},
- {h:'⚙️ تنظیمات — خوش‌آمد',s:[
+  'اینجا بهترین جا برای افزودن <b>راهنمای کاربران</b> به هر زبان است، یک بخش انگلیسی و یک بخش فارسی بساز.']},
+ {h:'⚙️ تنظیمات، خوش‌آمد',s:[
   '<b>پیام خوش‌آمد</b> بالای منوی ربات نشان داده می‌شود. کادر <b>English</b> و <b>فارسی</b> را جدا تنظیم کن؛ کادر خالی یعنی استفاده از پیش‌فرض.']},
- {h:'✉️ تنظیمات — راه‌اندازی تماس',intro:'بگذار کاربران از ربات به تیم تو پیام بدهند. تنظیم یک‌باره:',s:[
+ {h:'✉️ تنظیمات، راه‌اندازی تماس',intro:'بگذار کاربران از ربات به تیم تو پیام بدهند. تنظیم یک‌باره:',s:[
   'در <b>@BotFather</b> دستور <code>/setprivacy</code> را بفرست، ربات را انتخاب کن و <b>Disable</b> را بزن (تا ربات بتواند پاسخ ادمین‌ها را در گروه بخواند).',
   'یک <b>گروه</b> تلگرام برای ادمین‌ها بساز و <b>@IRNovaProxy_Bot</b> را به آن اضافه کن.',
-  'در آن گروه <code>/id</code> بفرست — ربات آیدی گروه را جواب می‌دهد.',
+  'در آن گروه <code>/id</code> بفرست، ربات آیدی گروه را جواب می‌دهد.',
   'آن آیدی را در <b>آیدی گروه ادمین</b> همین‌جا بچسبان و <b>ذخیره</b> را بزن.',
   'حالا وقتی کاربری <b>تماس با ما</b> را می‌زند و می‌نویسد، در گروه شما ظاهر می‌شود. در گروه به آن پیام <b>ریپلای</b> کن تا ربات جوابت را خصوصی به کاربر برساند.',
   'هر پیام فوروارد‌شده یک کارت خلاصه دارد: <b>نام، یوزرنیم و آیدی عددی</b>. وقتی پاسخت تحویل شد، دکمهٔ پاسخ سبز می‌شود و <b>پاسخ داده شد</b> نشان می‌دهد تا بدانی کدام پیام‌ها رسیدگی شده‌اند.',
@@ -439,13 +457,13 @@ fa:[
  {h:'📢 پیام همگانی',s:[
   'یک پیام بنویس و <b>ارسال به همه</b> را بزن. در پس‌زمینه به همهٔ کاربران ربات می‌رود.',
   'HTML مجاز است. کسانی که ربات را بلاک کرده‌اند یا تو مسدودشان کرده‌ای به‌طور خودکار رد می‌شوند.',
-  'نکته: کوتاه و مفید نگه‌دار — یک قابلیت تازه، یک به‌روزرسانی، یک سرور جدید. زیاده‌روی باعث بلاک می‌شود.']},
+  'نکته: کوتاه و مفید نگه‌دار، یک قابلیت تازه، یک به‌روزرسانی، یک سرور جدید. زیاده‌روی باعث بلاک می‌شود.']},
  {h:'🚫 کاربران و مسدودسازی',s:[
   '<b>کاربران</b> را باز کن تا همه را ببینی، با نام / یوزرنیم / آیدی جست‌وجو کنی و هر کدام را <b>مسدود</b> یا <b>آزاد</b> کنی.',
   'برای مسدود کردن کسی که فقط آیدی‌اش را داری، در <b>مسدود کردن با آیدی</b> بچسبانش (آیدی روی هر پیام در گروه تماس دیده می‌شود).',
   'همچنین می‌توانی روی هر پیام در گروه تماس دکمهٔ <b>🚫 مسدود کردن</b> را بزنی.',
   'کاربر مسدودشده یک پیام کوتاه «عدم دسترسی» می‌گیرد و ربات بقیهٔ پیام‌هایش را نادیده می‌گیرد، تا وقتی آزادش کنی.']},
- {h:'🚀 کاربران چطور پنل نصب می‌کنند',intro:'وقتی کاربری روی نصب می‌زند چه می‌بیند — برای کمک به دیگران خوب است بدانی:',s:[
+ {h:'🚀 کاربران چطور پنل نصب می‌کنند',intro:'وقتی کاربری روی نصب می‌زند چه می‌بیند، برای کمک به دیگران خوب است بدانی:',s:[
   'به یک <b>حساب رایگان Cloudflare</b> نیاز دارد (ربات لینک ثبت‌نام را می‌دهد).',
   '<b>گرفتن توکن</b> را می‌زند؛ یک صفحهٔ از‌پیش‌پرشدهٔ Cloudflare باز می‌شود. پایین می‌رود، <b>Continue to summary</b>، <b>Create Token</b>، و آن را <b>Copy</b> می‌کند.',
   'توکن را در چت می‌چسباند. ربات <b>فوراً پاکش می‌کند</b> و هرگز ذخیره‌اش نمی‌کند، بعد پنل را روی حساب خودش می‌سازد (حدود ۱ دقیقه).',
@@ -482,7 +500,7 @@ $('lg').onclick=function(e){var b=e.target.closest('button');if(b){lang=b.datase
 $('theme').onclick=function(){theme=theme==='dark'?'light':'dark';localStorage.setItem('nova-theme',theme);applyTheme()};
 
 async function loadStats(){var s=await api('GET','stats');$('stats').innerHTML=
- [['st_users',s.users],['st_active',s.active7d],['st_installs',s.installs],['st_builders',s.builders],['st_banned',s.banned||0]]
+ [['st_users',s.users],['st_active',s.active7d],['st_installs',s.installs],['st_builders',s.builders],['st_banned',s.banned||0],['st_qa',s.questions||0],['st_ai',s.aiAnswered||0]]
  .map(([k,n])=>'<div class="stat"><div class="n">'+n+'</div><div class="l">'+T(k)+'</div></div>').join('')}
 
 async function loadUsers(){var q=encodeURIComponent(($('usearch').value||'').trim());var list=await api('GET','users'+(q?('?q='+q):''));
@@ -490,7 +508,7 @@ async function loadUsers(){var q=encodeURIComponent(($('usearch').value||'').tri
  list.forEach(function(u){var d=document.createElement('div');d.className='item';
  var name=esc(u.first_name||'')+(u.username?' <span class="muted">@'+esc(u.username)+'</span>':'');
  d.innerHTML='<div class="q">'+name+(u.banned?' <span class="pill off">'+T('u_blocked')+'</span>':'')+'</div>'+
- '<div class="meta">ID <code>'+u.id+'</code> · '+(u.installs||0)+' '+T('u_installs')+' · '+esc((u.last_seen||'').slice(0,10))+'</div>'+
+ '<div class="meta">ID <code>'+u.id+'</code>, '+(u.installs||0)+' '+T('u_installs')+', '+esc((u.last_seen||'').slice(0,10))+'</div>'+
  '<div class="row" style="margin-top:11px"><button class="btn '+(u.banned?'ghost':'dg')+' sm" onclick="setBan('+u.id+','+(u.banned?0:1)+')">'+(u.banned?T('u_unblock'):T('u_block'))+'</button></div>';
  el.appendChild(d)})}
 async function setBan(id,banned){await api('POST','users',{id,banned:!!banned});toast(T('saved'));loadUsers()}
@@ -510,6 +528,10 @@ function editFaq(id){var f=window._faq.find(x=>x.id===id);var q=prompt('Question
  api('PUT','faq',{id,question:q,answer:a,position:f.position,enabled:f.enabled}).then(()=>{toast(T('saved'));loadFaq()})}
 function toggleFaq(id,en){var f=window._faq.find(x=>x.id===id);api('PUT','faq',{id,question:f.question,answer:f.answer,position:f.position,enabled:en}).then(loadFaq)}
 function delFaq(id){if(!confirm(T('confirm_del')))return;api('DELETE','faq',{id}).then(()=>{toast(T('deleted'));loadFaq()})}
+async function suggestFaq(btn){btn.disabled=true;var old=btn.textContent;btn.textContent='⏳ …';
+ var r=await api('POST','faq-suggest').catch(()=>null);btn.disabled=false;btn.textContent=old;
+ if(r&&r.ok){toast(T('faq_ai_done')+' '+r.added);loadFaq()}
+ else toast(r&&r.error==='no_api_key'?T('faq_ai_nokey'):(r&&r.error)||'Error')}
 
 async function loadSections(){var list=await api('GET','sections');window._sec=list;var el=$('seclist');
  el.innerHTML=list.length?'':'<p class="muted">'+T('none_sec')+'</p>';
@@ -532,12 +554,14 @@ async function loadConfig(){var c=await api('GET','config');welcome_en.value=c.w
  welcome_image.value=c.welcome_image||'';
  contact_group_id.value=c.contact_group_id||'';contact_enabled.checked=c.contact_enabled!=='0';faq_enabled.checked=c.faq_enabled!=='0';
  join_required.checked=c.join_required!=='0';join_channel.value=c.join_channel||'';
- support_text.value=c.support_text||'';support_links.value=c.support_links||''}
+ support_text.value=c.support_text||'';support_links.value=c.support_links||'';
+ ai_enabled.checked=c.ai_enabled!=='0';ai_model.value=c.ai_model||'claude-opus-4-8'}
 async function saveConfig(){await api('POST','config',{welcome_en:welcome_en.value,welcome_fa:welcome_fa.value,
  welcome_image:welcome_image.value.trim(),
  contact_group_id:contact_group_id.value.trim(),contact_enabled:contact_enabled.checked?'1':'0',faq_enabled:faq_enabled.checked?'1':'0',
  join_required:join_required.checked?'1':'0',join_channel:join_channel.value.trim().replace(/^@/,'').replace(/^https?:\\/\\/t\\.me\\//i,''),
- support_text:support_text.value,support_links:support_links.value});toast(T('saved'))}
+ support_text:support_text.value,support_links:support_links.value,
+ ai_enabled:ai_enabled.checked?'1':'0',ai_model:ai_model.value.trim()||'claude-opus-4-8'});toast(T('saved'))}
 
 async function broadcast(){var t=bc.value.trim();if(!t)return toast(T('fill'));if(!confirm(T('confirm_bc')))return;
  var r=await api('POST','broadcast',{text:t});if(r.ok){toast(T('sending')+' '+r.recipients);bc.value=''}else toast('Error')}
