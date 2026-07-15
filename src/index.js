@@ -67,7 +67,9 @@ export default {
       }
       let update;
       try { update = await request.json(); } catch { return new Response("ok"); }
-      ctx.waitUntil(handleUpdate(update, env).catch(() => {}));
+      ctx.waitUntil(handleUpdate(update, env).catch((e) => {
+        console.error("update error:", e && e.stack || e);
+      }));
       return new Response("ok");
     }
 

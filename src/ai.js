@@ -113,7 +113,9 @@ const ANSWER_SCHEMA = {
 
 async function knowledgePack(env) {
   const faq = await listFaq(env).catch(() => []);
-  const humanQa = await listAnsweredQa(env, { source: "human", limit: 40 }).catch(() => []);
+  // Keep the pack small: prompt size is the main driver of Workers AI latency,
+  // and the whole flow must finish well inside the post-response time budget.
+  const humanQa = await listAnsweredQa(env, { source: "human", limit: 25 }).catch(() => []);
   let kb = NOVA_REFERENCE;
   if (faq.length) {
     kb += "\n\nOfficial FAQ entries:\n" +
@@ -121,7 +123,7 @@ async function knowledgePack(env) {
   }
   if (humanQa.length) {
     kb += "\n\nPast questions answered by the human support team (gold standard):\n" +
-      humanQa.map((r) => `Q: ${r.question}\nA: ${r.answer}`).join("\n---\n");
+      humanQa.map((r) => `Q: ${String(r.question).slice(0, 300)}\nA: ${String(r.answer).slice(0, 600)}`).join("\n---\n");
   }
   return kb;
 }
@@ -141,6 +143,8 @@ export async function autoAnswer(env, question, lang) {
       "- Set confident=false when the question is not clearly covered, involves account " +
       "security, payments, lost data, legal topics, a bug report, or an angry/frustrated user. " +
       "A human will take over; do not guess.\n" +
+      "- Managing or deleting Cloudflare resources (workers, databases, KV, tokens) beyond the " +
+      "bot's own install/update flow is NOT covered: set confident=false.\n" +
       "- Never invent URLs, commands, or facts. Only use links that appear in the knowledge pack.\n" +
       "- Never ask the user to share their Cloudflare token, password, or subscription link in chat " +
       "beyond what the bot's own install/update flow does.\n" +
