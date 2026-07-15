@@ -111,22 +111,25 @@ export async function handleUpdate(update, env) {
 
 // ── Main menu ───────────────────────────────────────────────────────────────
 
+// Layout mirrors the reference design: green build button, blue manage button,
+// paired half-width utility rows, red Support us as the closing row.
 async function menuMarkup(env, lang) {
   const rows = [
-    [{ text: t(lang, "btn_install"), callback_data: "install", style: "primary" }],
+    [{ text: t(lang, "btn_install"), callback_data: "install", style: "success" }],
     [{ text: t(lang, "btn_update"), callback_data: "update", style: "primary" }],
   ];
-  if ((await getConfig(env, "faq_enabled", "1")) === "1") {
-    const faq = await listFaq(env);
-    if (faq.length) rows.push([{ text: t(lang, "btn_faq"), callback_data: "faq" }]);
-  }
   for (const s of await listSections(env)) rows.push([{ text: s.title, callback_data: `sec:${s.id}` }]);
-  rows.push([{ text: t(lang, "btn_apps"), callback_data: "apps" }]);
-  rows.push([{ text: t(lang, "btn_support"), callback_data: "support", style: "success" }]);
+  const appsBtn = { text: t(lang, "btn_apps"), callback_data: "apps" };
+  const faqOn = (await getConfig(env, "faq_enabled", "1")) === "1" && (await listFaq(env)).length > 0;
+  rows.push(faqOn ? [appsBtn, { text: t(lang, "btn_faq"), callback_data: "faq" }] : [appsBtn]);
+  const ghBtn = { text: t(lang, "btn_github"), url: "https://github.com/IRNova/Nova-Proxy" };
   if ((await getConfig(env, "contact_enabled", "1")) === "1") {
-    rows.push([{ text: t(lang, "btn_contact"), callback_data: "contact" }]);
+    rows.push([{ text: t(lang, "btn_contact"), callback_data: "contact" }, ghBtn]);
+  } else {
+    rows.push([ghBtn]);
   }
   rows.push([{ text: t(lang, "btn_lang"), callback_data: "lang" }]);
+  rows.push([{ text: t(lang, "btn_support"), callback_data: "support", style: "danger" }]);
   return { inline_keyboard: rows };
 }
 
@@ -168,7 +171,7 @@ async function menuText(env, from, lang) {
   const welcome = (await getConfig(env, "welcome_" + lang, "")).trim() ||
     (await getConfig(env, "welcome", "")).trim();
   const hi = from && from.first_name ? esc(from.first_name) : (lang === "fa" ? "دوست عزیز" : "there");
-  return welcome || `${t(lang, "menu_hi", hi)}\n\n${t(lang, "menu_body")}`;
+  return welcome || `${t(lang, "menu_title")}\n\n${t(lang, "menu_hi", hi)}\n${t(lang, "menu_body")}`;
 }
 
 async function sendMenu(env, chatId, from, lang) {
@@ -241,10 +244,10 @@ async function handleCallback(cb, env) {
       : `<a href="tg://user?id=${a.id}">${esc(a.first_name || "admin")}</a>`;
     const prompt =
       `${mention}\n` +
-      `✍️ <b>Reply to ${esc(name)}</b> · پاسخ به ${esc(name)}\n` +
-      `Type your message below · پیام خود را بنویسید`;
+      `✍️ <b>Reply to ${esc(name)}</b> / پاسخ به ${esc(name)}\n` +
+      `Type your message below / پیام خود را بنویسید`;
     const sent = await send(env, group, prompt, {
-      reply_markup: { force_reply: true, selective: true, input_field_placeholder: "Your reply · پاسخ شما" },
+      reply_markup: { force_reply: true, selective: true, input_field_placeholder: "Your reply / پاسخ شما" },
     }).catch(() => null);
     if (sent && sent.ok && sent.result) {
       // card_msg_id points back at the card the button sits on, so answering
@@ -382,8 +385,8 @@ async function editSupport(env, chatId, msgId, lang) {
 function appsKeyboard(lang) {
   return {
     inline_keyboard: [
-      [{ text: t(lang, "btn_android"), url: "https://github.com/IRNova/Nova-Client/releases/latest/download/nova-client.apk" }],
-      [{ text: t(lang, "btn_all_dl"), url: "https://github.com/IRNova/Nova-Client/releases" }],
+      [{ text: t(lang, "btn_android"), url: "https://github.com/IRNova/Nova-Client/releases/latest/download/nova-client.apk", style: "success" }],
+      [{ text: t(lang, "btn_all_dl"), url: "https://github.com/IRNova/Nova-Client/releases", style: "primary" }],
       backRow(lang),
     ],
   };
