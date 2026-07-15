@@ -98,6 +98,51 @@ export async function getSection(env, id) {
   return env.DB.prepare("SELECT * FROM sections WHERE id = ?").bind(id).first();
 }
 
+// ── Q&A log (support questions + answers, feeds AI and FAQ suggestions) ─────
+
+export async function logQuestion(env, userId, lang, question) {
+  const r = await env.DB.prepare(
+    "INSERT INTO qa_log (user_id, lang, question) VALUES (?, ?, ?) RETURNING id"
+  ).bind(userId, lang || "en", question).first();
+  return r ? r.id : null;
+}
+
+export async function setQaAnswer(env, qaId, answer, source) {
+  if (!qaId) return;
+  await env.DB.prepare(
+    "UPDATE qa_log SET answer = ?, source = ?, answered_at = datetime('now') WHERE id = ?"
+  ).bind(answer, source, qaId).run();
+}
+
+// Record an admin's group reply as the (human) answer to the question the
+// card carries. A human answer always wins over an earlier AI answer.
+export async function setQaAnswerByCard(env, cardMsgId, answer) {
+  await env.DB.prepare(
+    `UPDATE qa_log SET answer = ?, source = 'human', answered_at = datetime('now')
+     WHERE id = (SELECT qa_id FROM contact_map WHERE group_msg_id = ?)`
+  ).bind(answer, cardMsgId).run();
+}
+
+export async function markQaResolved(env, qaId) {
+  await env.DB.prepare("UPDATE qa_log SET resolved = 1 WHERE id = ?").bind(qaId).run();
+}
+
+export async function getQa(env, qaId) {
+  return env.DB.prepare("SELECT * FROM qa_log WHERE id = ?").bind(qaId).first();
+}
+
+// Recent answered exchanges, most recent first. Human answers are the gold
+// standard for the AI knowledge pack; pass source to filter.
+export async function listAnsweredQa(env, { source = null, limit = 40 } = {}) {
+  let q = "SELECT question, answer, lang, source FROM qa_log WHERE answer IS NOT NULL AND answer != ''";
+  const binds = [];
+  if (source) { q += " AND source = ?"; binds.push(source); }
+  q += " ORDER BY id DESC LIMIT ?";
+  binds.push(limit);
+  const { results } = await env.DB.prepare(q).bind(...binds).all();
+  return results || [];
+}
+
 export async function stats(env) {
   const users = await env.DB.prepare("SELECT COUNT(*) n FROM users").first();
   const active = await env.DB.prepare(
@@ -105,7 +150,11 @@ export async function stats(env) {
   const installs = await env.DB.prepare("SELECT COALESCE(SUM(installs),0) n FROM users").first();
   const builders = await env.DB.prepare("SELECT COUNT(*) n FROM users WHERE installs > 0").first();
   const banned = await env.DB.prepare("SELECT COUNT(*) n FROM users WHERE banned = 1").first();
+  // qa_log may not exist until migration 005 runs; treat that as zero.
+  const qa = await env.DB.prepare("SELECT COUNT(*) n FROM qa_log").first().catch(() => ({ n: 0 }));
+  const ai = await env.DB.prepare("SELECT COUNT(*) n FROM qa_log WHERE source = 'ai'").first().catch(() => ({ n: 0 }));
   return {
     users: users.n, active7d: active.n, installs: installs.n, builders: builders.n, banned: banned.n,
+    questions: qa.n, aiAnswered: ai.n,
   };
 }

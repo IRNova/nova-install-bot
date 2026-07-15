@@ -78,6 +78,11 @@ export const STR = {
     contact_sent: "✅ Sent! Our team will get back to you here.",
     reply_prefix: "💬 <b>Reply from the Nova team:</b>",
 
+    // AI auto-answer
+    btn_ai_solved: "✅ Solved",
+    btn_ai_human: "👤 Talk to support",
+    ai_note: "🤖 Automated answer. Not what you needed? Tap “Talk to support” and our team will step in.",
+
     nudge: "Send /install to set up your Nova panel, or paste your Cloudflare token when you have it.",
     banned: "🚫 You no longer have access to this bot.",
 
@@ -184,6 +189,11 @@ export const STR = {
     contact_notset: "ممنون! اما تماس هنوز تنظیم نشده. لطفاً بعداً امتحان کن.",
     contact_sent: "✅ ارسال شد! تیم ما همین‌جا جوابت را می‌دهد.",
     reply_prefix: "💬 <b>پاسخ از تیم نوا:</b>",
+
+    // AI auto-answer
+    btn_ai_solved: "✅ حل شد",
+    btn_ai_human: "👤 ارتباط با پشتیبان",
+    ai_note: "🤖 پاسخ خودکار. جوابت را نگرفتی؟ روی «ارتباط با پشتیبان» بزن تا تیم ما وارد شود.",
 
     nudge: "برای ساخت پنل نوا /install را بفرست، یا وقتی توکن Cloudflare را داشتی همین‌جا بچسبان.",
     banned: "🚫 دیگر به این ربات دسترسی نداری.",

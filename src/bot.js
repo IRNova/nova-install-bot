@@ -5,7 +5,9 @@ import { tg, send, edit, sendPhoto, editCaption, answerCb, deleteMessage, esc } 
 import {
   touchUser, getConfig, setConfig, listFaq, getFaq, listSections, getSection,
   markBlocked, getUserLang, setUserLang, isBanned, setBanned,
+  logQuestion, setQaAnswer, setQaAnswerByCard, markQaResolved, getQa,
 } from "./db.js";
+import { aiEnabled, autoAnswer } from "./ai.js";
 import { install, TOKEN_DEEPLINK, extractToken } from "./install.js";
 import { startUpdate, runUpdate, loadUpdCtx, clearUpdCtx } from "./update.js";
 import { t, normLang } from "./i18n.js";
@@ -66,11 +68,12 @@ export async function handleUpdate(update, env) {
     return install(env, chatId, token, from.id, lang);
   }
 
-  // Contact mode: the user's next message goes to the admin group.
+  // Contact mode: the user's next message is answered by the AI assistant
+  // when it is confident, otherwise it goes to the admin group.
   const pendingContact = await getConfig(env, `await_contact_${from.id}`, "");
   if (pendingContact === "1" && !isCommand) {
     await setConfig(env, `await_contact_${from.id}`, "");
-    return forwardContact(env, from, chatId, msg, lang);
+    return handleContactMessage(env, from, chatId, msg, lang);
   }
 
   // Awaiting a token (user tapped Install or Update): a non-command reply that
@@ -296,6 +299,28 @@ async function handleCallback(cb, env) {
 
   await answerCb(env, cb.id);
 
+  // AI answer feedback: "Solved" closes the loop; "Talk to support" escalates
+  // the original question (plus the AI's answer) to the admin group.
+  if (data.startsWith("aiok:")) {
+    await markQaResolved(env, +data.slice(5)).catch(() => {});
+    await tg(env, "editMessageReplyMarkup", {
+      chat_id: chatId, message_id: msgId,
+      reply_markup: { inline_keyboard: [backRow(lang)] },
+    }).catch(() => {});
+    return;
+  }
+  if (data.startsWith("aiesc:")) {
+    const qa = await getQa(env, +data.slice(6)).catch(() => null);
+    await tg(env, "editMessageReplyMarkup", {
+      chat_id: chatId, message_id: msgId,
+      reply_markup: { inline_keyboard: [backRow(lang)] },
+    }).catch(() => {});
+    if (!qa) return startContact(env, chatId, cb.from.id, lang);
+    const note = `⚠️ <b>Escalated</b>: the assistant answered but the user asked for a human.` +
+      (qa.answer ? `\n\n🤖 <i>AI answer was:</i> ${esc(qa.answer)}` : "");
+    return forwardContact(env, cb.from, chatId, { text: qa.question }, lang, { qaId: qa.id, note });
+  }
+
   if (data === "menu") return replaceWithMenu(env, chatId, msgId, cb.from, lang);
   if (data === "lang") return toggleLang(env, chatId, cb.from.id, lang, msgId);
   if (data === "install") {
@@ -454,12 +479,66 @@ function contactKb(userId, banned, replied) {
   ]] };
 }
 
-async function forwardContact(env, from, chatId, msg, lang) {
+// Every support message is logged to qa_log. The AI assistant answers when it
+// is confident; anything else (AI off, no key, API error, low confidence) goes
+// to the admin group exactly as before.
+async function handleContactMessage(env, from, chatId, msg, lang) {
+  const question = (msg.text || "").trim();
+  const qaId = question ? await logQuestion(env, from.id, lang, question).catch(() => null) : null;
+
+  if (question && (await aiEnabled(env))) {
+    await tg(env, "sendChatAction", { chat_id: chatId, action: "typing" }).catch(() => {});
+    const r = await autoAnswer(env, question, lang).catch(() => null);
+    if (r && r.confident && r.answer) {
+      await setQaAnswer(env, qaId, r.answer, "ai").catch(() => {});
+      const kb = { inline_keyboard: [
+        [
+          { text: t(lang, "btn_ai_solved"), callback_data: `aiok:${qaId}`, style: "success" },
+          { text: t(lang, "btn_ai_human"), callback_data: `aiesc:${qaId}`, style: "primary" },
+        ],
+        backRow(lang),
+      ] };
+      const body = `${r.answer}\n\n<i>${t(lang, "ai_note")}</i>`;
+      let sr = await send(env, chatId, body, { reply_markup: kb });
+      // The model's HTML can occasionally be malformed; resend escaped.
+      if (!sr || sr.ok === false) sr = await send(env, chatId, esc(r.answer), { reply_markup: kb });
+      if (sr && sr.ok !== false) {
+        await sendAiAudit(env, from, question, r.answer, qaId).catch(() => {});
+        return;
+      }
+    }
+  }
+  return forwardContact(env, from, chatId, msg, lang, { qaId });
+}
+
+// Copy of an auto-answered exchange for the admin group, with the usual
+// Reply/Block buttons so an admin can correct the assistant. A group reply to
+// this card overwrites the AI answer in qa_log with the human one.
+async function sendAiAudit(env, from, question, answer, qaId) {
+  const group = await getConfig(env, "contact_group_id", "");
+  if (!group) return;
+  const card = await gatherUserCard(env, from.id, from);
+  const text =
+    `🤖 <b>Auto-answered</b>\n\n` +
+    `❓ “${esc(question)}”\n\n` +
+    `💬 ${esc(answer)}\n\n` +
+    card.text +
+    `\n\n<i>Reply to this message to send a correction to the user.</i>`;
+  const sent = await send(env, group, text, { reply_markup: contactKb(from.id, false) });
+  if (sent && sent.result && sent.result.message_id) {
+    await env.DB.prepare(
+      "INSERT OR REPLACE INTO contact_map (group_msg_id, user_id, card_msg_id, qa_id) VALUES (?, ?, ?, ?)"
+    ).bind(sent.result.message_id, from.id, sent.result.message_id, qaId).run();
+  }
+}
+
+async function forwardContact(env, from, chatId, msg, lang, { qaId = null, note = "" } = {}) {
   const group = await getConfig(env, "contact_group_id", "");
   if (!group) return send(env, chatId, t(lang, "contact_notset"));
 
   const card = await gatherUserCard(env, from.id, from);
   const header =
+    (note ? note + "\n\n" : "") +
     `✉️ <b>New message</b>\n\n` +
     `“${esc(msg.text || "")}”\n\n` +
     card.text +
@@ -470,8 +549,8 @@ async function forwardContact(env, from, chatId, msg, lang) {
   const sent = await send(env, group, header, { reply_markup: kb });
   if (sent && sent.result && sent.result.message_id) {
     await env.DB.prepare(
-      "INSERT OR REPLACE INTO contact_map (group_msg_id, user_id, card_msg_id) VALUES (?, ?, ?)"
-    ).bind(sent.result.message_id, from.id, sent.result.message_id).run();
+      "INSERT OR REPLACE INTO contact_map (group_msg_id, user_id, card_msg_id, qa_id) VALUES (?, ?, ?, ?)"
+    ).bind(sent.result.message_id, from.id, sent.result.message_id, qaId).run();
   }
   return send(env, chatId, t(lang, "contact_sent"), { reply_markup: { inline_keyboard: [backRow(lang)] } });
 }
@@ -521,6 +600,9 @@ async function handleGroupReply(msg, env) {
     await env.DB.prepare(
       "UPDATE contact_map SET replied = 1 WHERE group_msg_id IN (?, ?)"
     ).bind(reply.message_id, cardId).run().catch(() => {});
+    // Record the delivered reply as the human answer to the question this
+    // card carries, so the AI learns from it and the FAQ suggester sees it.
+    await setQaAnswerByCard(env, cardId, msg.text).catch(() => {});
     const banned = await isBanned(env, userId);
     await tg(env, "editMessageReplyMarkup", {
       chat_id: msg.chat.id, message_id: cardId,
