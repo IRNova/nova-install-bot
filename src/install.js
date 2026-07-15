@@ -30,7 +30,7 @@ export function extractToken(text) {
   return m ? m[0] : null;
 }
 
-async function cf(method, path, token, body, ctype) {
+export async function cf(method, path, token, body, ctype) {
   const headers = { Authorization: `Bearer ${token}` };
   if (ctype) headers["Content-Type"] = ctype;
   const r = await fetch(CF + path, { method, headers, body });
@@ -40,8 +40,8 @@ async function cf(method, path, token, body, ctype) {
   return { status: r.status, json, text: txt };
 }
 
-const cfOk = (res) => !!(res.json && res.json.success === true);
-function cfErr(res) {
+export const cfOk = (res) => !!(res.json && res.json.success === true);
+export function cfErr(res) {
   try {
     const e = res.json && res.json.errors && res.json.errors[0];
     if (e) return `${e.message} (code ${e.code})`;
@@ -49,7 +49,7 @@ function cfErr(res) {
   return `HTTP ${res.status}`;
 }
 
-const rand = (n = 6) =>
+export const rand = (n = 6) =>
   Array.from({ length: n }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join("");
 
 function rname() {
@@ -203,8 +203,8 @@ function sendResult(env, chatId, url, online, lang = "en") {
   return send(env, chatId, text, {
     reply_markup: {
       inline_keyboard: [
-        [{ text: t(lang, "btn_setpw"), url: url + "/install" }],
-        [{ text: t(lang, "btn_open_panel"), url }],
+        [{ text: t(lang, "btn_setpw"), url: url + "/install", style: "success" }],
+        [{ text: t(lang, "btn_open_panel"), url, style: "primary" }],
         [{ text: t(lang, "btn_get_app"), url: "https://github.com/IRNova/Nova-Client/releases" }],
       ],
     },

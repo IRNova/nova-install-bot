@@ -34,48 +34,57 @@ function approxAccountEra(id) {
   return `≈ ${y}${tag}`;
 }
 
-export async function gatherUserCard(env, userId, from) {
-  // 1) Live profile via getChat (works because they've messaged the bot).
+// Default card is compact (name, username, numeric ID) — that's all the admins
+// need on every forwarded message. Pass { full: true } (used by /whois) for the
+// complete picture: bio, premium, language, account-age estimate, bot history.
+export async function gatherUserCard(env, userId, from, { full = false } = {}) {
+  // Live profile via getChat. The compact card can skip the API round-trip
+  // when the message itself already carries the sender's profile.
   let chat = {};
-  try {
-    const r = await tg(env, "getChat", { chat_id: userId });
-    if (r && r.ok) chat = r.result || {};
-  } catch {}
-
-  // 2) Our own record of them.
-  const row = await env.DB.prepare(
-    "SELECT lang, installs, banned, first_seen, last_seen FROM users WHERE id = ?"
-  ).bind(userId).first();
+  if (full || !from) {
+    try {
+      const r = await tg(env, "getChat", { chat_id: userId });
+      if (r && r.ok) chat = r.result || {};
+    } catch {}
+  }
 
   const f = from || {};
   const first = chat.first_name || f.first_name || "";
   const last = chat.last_name || f.last_name || "";
   const name = `${first} ${last}`.trim() || "(no name)";
   const username = chat.username || f.username;
-  const premium = (chat.is_premium ?? f.is_premium) ? "Yes ⭐" : "No";
-  const lang = f.language_code || (row && row.lang) || "?";
-  const era = approxAccountEra(userId);
 
   const lines = [
     `🔎 <b>${esc(name)}</b>`,
     username ? `Username: @${esc(username)} (<a href="https://t.me/${esc(username)}">open</a>)`
-             : `Username: none · <a href="tg://user?id=${userId}">open profile</a>`,
+             : `Username: none, <a href="tg://user?id=${userId}">open profile</a>`,
     `User ID: <code>${userId}</code>`,
-    chat.bio ? `Bio: <i>${esc(chat.bio)}</i>` : null,
-    `Telegram Premium: ${premium}`,
-    `Language: ${esc(lang)}`,
-    era ? `Account age (est. from ID): ${era}` : null,
   ];
+
+  if (!full) return { text: lines.join("\n") };
+
+  // Our own record of them.
+  const row = await env.DB.prepare(
+    "SELECT lang, installs, banned, first_seen, last_seen FROM users WHERE id = ?"
+  ).bind(userId).first();
+
+  const premium = (chat.is_premium ?? f.is_premium) ? "Yes ⭐" : "No";
+  const lang = f.language_code || (row && row.lang) || "?";
+  const era = approxAccountEra(userId);
+
+  if (chat.bio) lines.push(`Bio: <i>${esc(chat.bio)}</i>`);
+  lines.push(`Telegram Premium: ${premium}`, `Language: ${esc(lang)}`);
+  if (era) lines.push(`Account age (est. from ID): ${era}`);
 
   if (row) {
     const hist = [];
     if (row.first_seen) hist.push(`first seen ${String(row.first_seen).slice(0, 10)}`);
     if (row.installs) hist.push(`${row.installs} panel${row.installs === 1 ? "" : "s"} built`);
     if (row.banned) hist.push("🚫 currently blocked");
-    if (hist.length) lines.push(`With this bot: ${hist.join(" · ")}`);
+    if (hist.length) lines.push(`With this bot: ${hist.join(", ")}`);
   } else {
     lines.push("With this bot: first contact");
   }
 
-  return { text: lines.filter(Boolean).join("\n") };
+  return { text: lines.join("\n") };
 }

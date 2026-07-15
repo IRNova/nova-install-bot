@@ -275,6 +275,23 @@ export const DASHBOARD_HTML = HEAD("Nova Bot Admin") + `<body>${THEME_BOOT}
     <button class="btn" onclick="saveConfig()" data-k="save">Save</button>
    </div>
    <div class="card">
+    <h2 data-k="chan">Required channel</h2>
+    <div class="desc" data-k="chan_d">Users must join this channel before they can use the bot. The bot must be an <b>admin</b> of the channel for the check to work; until it is, everyone is let through.</div>
+    <label class="switch" style="margin-top:0"><input type="checkbox" id="join_required"> <span data-k="chan_enable">Require channel membership</span></label>
+    <label data-k="chan_user">Channel username</label>
+    <input id="join_channel" placeholder="irnova_proxy" dir="ltr">
+    <div><button class="btn" onclick="saveConfig()" data-k="save">Save</button></div>
+   </div>
+   <div class="card">
+    <h2 data-k="sup">Support us</h2>
+    <div class="desc" data-k="sup_d">Shown when a user taps 💝 Support us in the bot. If both fields are empty, the bot tells users support isn't set up yet.</div>
+    <label data-k="sup_text">Message (HTML allowed, e.g. wallet addresses in &lt;code&gt;)</label>
+    <textarea id="support_text" dir="auto"></textarea>
+    <label data-k="sup_links">Link buttons, one per line: Label | https://url</label>
+    <textarea id="support_links" dir="ltr" placeholder="Donate | https://example.com/donate"></textarea>
+    <div><button class="btn" onclick="saveConfig()" data-k="save">Save</button></div>
+   </div>
+   <div class="card">
     <h2 data-k="contact">Contact us</h2>
     <label class="switch"><input type="checkbox" id="contact_enabled"> <span data-k="c_enable">Enable "Contact us"</span></label>
     <label data-k="c_group">Admin group chat ID</label>
@@ -312,6 +329,8 @@ var I={en:{manage:'Manage',help:'Help',guide:'Guide',stats:'Stats',faq:'FAQ',sec
  sec_add:'Add a menu section',sec_add_d:"Adds a button to the bot's main menu with your text and an optional link.",s_t:'Button title',s_b:'Body (HTML allowed)',s_bt:'Link button text (optional)',s_bu:'Link URL (optional)',add_sec:'Add section',
  welcome:'Welcome message',welcome_d:'Shown at the top of the main menu. Leave blank for the default. Set each language separately.',save:'Save',
  contact:'Contact us',c_enable:'Enable "Contact us"',c_group:'Admin group chat ID',c_group_d:'Create a Telegram group, add <b>@IRNovaProxy_Bot</b> as an admin, send <code>/id</code> in the group, and paste the ID here. Reply to a forwarded message to answer that user.',show_faq:'Show FAQ in menu',
+ chan:'Required channel',chan_d:'Users must join this channel before they can use the bot. The bot must be an <b>admin</b> of the channel for the check to work; until it is, everyone is let through.',chan_enable:'Require channel membership',chan_user:'Channel username',
+ sup:'Support us',sup_d:"Shown when a user taps 💝 Support us in the bot. If both fields are empty, the bot tells users support isn't set up yet.",sup_text:'Message (HTML allowed, e.g. wallet addresses in &lt;code&gt;)',sup_links:'Link buttons, one per line: Label | https://url',
  bc:'Broadcast',bc_d:'Send a message to everyone who has used the bot. HTML allowed. Sends in the background.',bc_send:'Send to all users',
  edit:'Edit',hide:'Hide',show:'Show',del:'Delete',hidden:'hidden',none_faq:'No questions yet.',none_sec:'No sections yet.',
  saved:'Saved',added:'Added',deleted:'Deleted',sending:'Sending to',fill:'Please fill the fields',confirm_del:'Delete this?',confirm_bc:'Send to all users?'},
@@ -326,6 +345,8 @@ fa:{manage:'مدیریت',help:'راهنما',guide:'راهنما',stats:'آما
  sec_add:'افزودن بخش منو',sec_add_d:'یک دکمه به منوی اصلی ربات با متن شما و یک لینک اختیاری اضافه می‌کند.',s_t:'عنوان دکمه',s_b:'متن (HTML مجاز)',s_bt:'متن دکمهٔ لینک (اختیاری)',s_bu:'آدرس لینک (اختیاری)',add_sec:'افزودن بخش',
  welcome:'پیام خوش‌آمد',welcome_d:'بالای منوی اصلی نشان داده می‌شود. برای پیش‌فرض خالی بگذار. هر زبان را جدا تنظیم کن.',save:'ذخیره',
  contact:'تماس با ما',c_enable:'فعال‌سازی «تماس با ما»',c_group:'آیدی گروه ادمین',c_group_d:'یک گروه تلگرام بساز، <b>@IRNovaProxy_Bot</b> را ادمین کن، در گروه <code>/id</code> بفرست و آیدی را اینجا بچسبان. برای پاسخ به کاربر، روی پیام فوروارد‌شده ریپلای کن.',show_faq:'نمایش سؤالات در منو',
+ chan:'کانال اجباری',chan_d:'کاربران باید قبل از استفاده از ربات عضو این کانال شوند. برای کار کردن این بررسی، ربات باید <b>ادمین</b> کانال باشد؛ تا آن موقع همه عبور داده می‌شوند.',chan_enable:'اجباری بودن عضویت در کانال',chan_user:'یوزرنیم کانال',
+ sup:'حمایت از ما',sup_d:'وقتی کاربر در ربات 💝 حمایت از ما را می‌زند نشان داده می‌شود. اگر هر دو فیلد خالی باشند، ربات به کاربران می‌گوید حمایت هنوز تنظیم نشده.',sup_text:'پیام (HTML مجاز، مثلاً آدرس کیف پول داخل <code>)',sup_links:'دکمه‌های لینک، هر خط یکی: عنوان | https://url',
  bc:'پیام همگانی',bc_d:'به همهٔ کسانی که از ربات استفاده کرده‌اند پیام بفرست. HTML مجاز است. در پس‌زمینه ارسال می‌شود.',bc_send:'ارسال به همه',
  edit:'ویرایش',hide:'پنهان',show:'نمایش',del:'حذف',hidden:'پنهان',none_faq:'هنوز سؤالی نیست.',none_sec:'هنوز بخشی نیست.',
  saved:'ذخیره شد',added:'اضافه شد',deleted:'حذف شد',sending:'در حال ارسال به',fill:'لطفاً فیلدها را پر کن',confirm_del:'حذف شود؟',confirm_bc:'به همهٔ کاربران ارسال شود؟'}};
@@ -354,8 +375,12 @@ var GUIDE={en:[
   'In that group send <code>/id</code> — the bot replies with the group ID.',
   'Paste that ID into <b>Admin group chat ID</b> here and tap <b>Save</b>.',
   'Now when a user taps <b>Contact us</b> and writes, it appears in your group. <b>Reply</b> to that message in the group and the bot relays your answer back to the user privately.',
-  'Each forwarded message comes with a <b>profile card</b> — name, @username (tap to open), ID, bio, Telegram Premium, language, a rough account-age estimate from the ID, their history with your bot, and their profile photo. Handy for spotting abusive throwaway accounts.',
-  'Send <code>/whois &lt;id&gt;</code> in the group, or reply <code>/whois</code> to a forwarded message, to pull that card any time.']},
+  'Each forwarded message shows a compact card: <b>name, @username and numeric ID</b>. Once your reply is delivered, the Reply button turns green and reads <b>Replied</b>, so you can see which messages are handled.',
+  'Need the full picture on someone (bio, Premium, account-age estimate, history with the bot)? Send <code>/whois &lt;id&gt;</code> in the group, or reply <code>/whois</code> to a forwarded message.']},
+ {h:'📣 Channel lock, Support us, Update panel',s:[
+  '<b>Required channel</b> (Settings): users must join your channel before the bot responds. Add the bot as an <b>admin</b> of the channel, or the check is skipped and everyone is let through.',
+  '<b>Support us</b> (Settings): fill in a message (wallet addresses, HTML allowed) and/or link buttons (one per line, <code>Label | https://url</code>). The bot menu shows a green 💝 button; while both fields are empty it tells users support is not set up yet.',
+  '<b>Update my panel</b>: users can update an existing Nova panel to the latest version from the bot menu. They send a token like during install, pick their Worker from a list, and confirm. Code is replaced, settings and users are kept.']},
  {h:'📢 Broadcast',s:[
   'Type a message and tap <b>Send to all users</b>. It goes to everyone who has used the bot, in the background.',
   'HTML is allowed. People who blocked the bot, or who you blocked, are skipped automatically.',
@@ -396,8 +421,12 @@ fa:[
   'در آن گروه <code>/id</code> بفرست — ربات آیدی گروه را جواب می‌دهد.',
   'آن آیدی را در <b>آیدی گروه ادمین</b> همین‌جا بچسبان و <b>ذخیره</b> را بزن.',
   'حالا وقتی کاربری <b>تماس با ما</b> را می‌زند و می‌نویسد، در گروه شما ظاهر می‌شود. در گروه به آن پیام <b>ریپلای</b> کن تا ربات جوابت را خصوصی به کاربر برساند.',
-  'هر پیام فوروارد‌شده همراه یک <b>کارت پروفایل</b> می‌آید — نام، یوزرنیم (برای باز کردن بزن)، آیدی، بیو، پرمیوم تلگرام، زبان، تخمین سنِ حساب از روی آیدی، سابقهٔ کاربر با ربات و عکس پروفایل. برای شناسایی اکانت‌های یک‌بارمصرفِ مزاحم مفید است.',
-  'برای دیدن این کارت هر وقت خواستی، در گروه <code>/whois &lt;id&gt;</code> بفرست یا روی پیام فوروارد‌شده <code>/whois</code> ریپلای کن.']},
+  'هر پیام فوروارد‌شده یک کارت خلاصه دارد: <b>نام، یوزرنیم و آیدی عددی</b>. وقتی پاسخت تحویل شد، دکمهٔ پاسخ سبز می‌شود و <b>پاسخ داده شد</b> نشان می‌دهد تا بدانی کدام پیام‌ها رسیدگی شده‌اند.',
+  'اطلاعات کامل کسی را می‌خواهی (بیو، پرمیوم، تخمین سن حساب، سابقه با ربات)؟ در گروه <code>/whois &lt;id&gt;</code> بفرست یا روی پیام فوروارد‌شده <code>/whois</code> ریپلای کن.']},
+ {h:'📣 قفل کانال، حمایت از ما، به‌روزرسانی پنل',s:[
+  '<b>کانال اجباری</b> (تنظیمات): کاربران باید قبل از پاسخ‌گویی ربات عضو کانالت شوند. ربات را <b>ادمین</b> کانال کن، وگرنه بررسی رد می‌شود و همه عبور می‌کنند.',
+  '<b>حمایت از ما</b> (تنظیمات): یک پیام (آدرس کیف پول، HTML مجاز) و/یا دکمه‌های لینک (هر خط یکی، <code>عنوان | https://url</code>) وارد کن. منوی ربات یک دکمهٔ سبز 💝 نشان می‌دهد؛ تا وقتی هر دو فیلد خالی باشند به کاربران می‌گوید حمایت هنوز تنظیم نشده.',
+  '<b>به‌روزرسانی پنل من</b>: کاربران می‌توانند پنل نوای موجودشان را از منوی ربات به آخرین نسخه به‌روز کنند. مثل نصب
  {h:'📢 پیام همگانی',s:[
   'یک پیام بنویس و <b>ارسال به همه</b> را بزن. در پس‌زمینه به همهٔ کاربران ربات می‌رود.',
   'HTML مجاز است. کسانی که ربات را بلاک کرده‌اند یا تو مسدودشان کرده‌ای به‌طور خودکار رد می‌شوند.',
@@ -491,9 +520,13 @@ function toggleSection(id,en){var s=window._sec.find(x=>x.id===id);api('PUT','se
 function delSection(id){if(!confirm(T('confirm_del')))return;api('DELETE','sections',{id}).then(()=>{toast(T('deleted'));loadSections()})}
 
 async function loadConfig(){var c=await api('GET','config');welcome_en.value=c.welcome_en||c.welcome||'';welcome_fa.value=c.welcome_fa||'';
- contact_group_id.value=c.contact_group_id||'';contact_enabled.checked=c.contact_enabled!=='0';faq_enabled.checked=c.faq_enabled!=='0'}
+ contact_group_id.value=c.contact_group_id||'';contact_enabled.checked=c.contact_enabled!=='0';faq_enabled.checked=c.faq_enabled!=='0';
+ join_required.checked=c.join_required!=='0';join_channel.value=c.join_channel||'';
+ support_text.value=c.support_text||'';support_links.value=c.support_links||''}
 async function saveConfig(){await api('POST','config',{welcome_en:welcome_en.value,welcome_fa:welcome_fa.value,
- contact_group_id:contact_group_id.value.trim(),contact_enabled:contact_enabled.checked?'1':'0',faq_enabled:faq_enabled.checked?'1':'0'});toast(T('saved'))}
+ contact_group_id:contact_group_id.value.trim(),contact_enabled:contact_enabled.checked?'1':'0',faq_enabled:faq_enabled.checked?'1':'0',
+ join_required:join_required.checked?'1':'0',join_channel:join_channel.value.trim().replace(/^@/,'').replace(/^https?:\\/\\/t\\.me\\//i,''),
+ support_text:support_text.value,support_links:support_links.value});toast(T('saved'))}
 
 async function broadcast(){var t=bc.value.trim();if(!t)return toast(T('fill'));if(!confirm(T('confirm_bc')))return;
  var r=await api('POST','broadcast',{text:t});if(r.ok){toast(T('sending')+' '+r.recipients);bc.value=''}else toast('Error')}

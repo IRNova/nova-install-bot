@@ -23,8 +23,10 @@ export function edit(env, chatId, messageId, text, extra = {}) {
   });
 }
 
-export function answerCb(env, id, text) {
-  return tg(env, "answerCallbackQuery", { callback_query_id: id, text: text || "" });
+export function answerCb(env, id, text, showAlert) {
+  return tg(env, "answerCallbackQuery", {
+    callback_query_id: id, text: text || "", show_alert: !!showAlert,
+  });
 }
 
 export function deleteMessage(env, chatId, messageId) {

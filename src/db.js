@@ -11,6 +11,10 @@ export async function setConfig(env, key, value) {
   ).bind(key, String(value ?? "")).run();
 }
 
+export async function delConfig(env, key) {
+  await env.DB.prepare("DELETE FROM config WHERE key = ?").bind(key).run();
+}
+
 // Record or refresh a user; used for stats and broadcast reach. On first sight
 // we seed `lang` from Telegram's language_code; a later explicit choice wins and
 // is preserved (ON CONFLICT does not touch lang).

@@ -78,6 +78,38 @@ export const STR = {
 
     nudge: "Send /install to set up your Nova panel, or paste your Cloudflare token when you have it.",
     banned: "🚫 You no longer have access to this bot.",
+
+    // channel membership gate
+    join_text:
+      "📣 <b>Join our channel first</b>\n\nTo use this bot you need to be a member of our Telegram channel. Join, then tap <b>I've joined</b>.",
+    btn_join: "📣 Join the channel",
+    btn_joined: "✅ I've joined",
+    join_no: "You're not a member yet. Join the channel first, then tap again.",
+    join_ok: "✅ Welcome!",
+
+    // update panel
+    btn_update: "🔄 Update my panel",
+    upd_text:
+      "🔄 <b>Update my panel</b>\n\n" +
+      "I'll update your existing Nova panel to the latest version. Your settings, users and data stay untouched.\n\n" +
+      "<b>1.</b> Tap <b>Get my token</b> and create a token (same steps as install).\n" +
+      "<b>2.</b> Paste the token here. I keep it only for a few minutes to finish the update, then delete it.",
+    upd_pick:
+      "🔄 <b>Pick your panel's Worker</b>\n\nThese are the Workers on your Cloudflare account. Choose the one that runs your Nova panel:",
+    upd_none: "I couldn't find any Workers on this account. Build a panel first with 🚀 Install.",
+    upd_confirm: (name) =>
+      `⚠️ <b>Update “${name}”?</b>\n\nThis replaces that Worker's code with the latest Nova. Settings, users and data are kept. Only continue if this Worker really is your Nova panel.`,
+    btn_upd_go: "✅ Update now",
+    btn_upd_cancel: "✖️ Cancel",
+    upd_run: "⏳ <b>Updating…</b>",
+    upd_done: (name) => `✅ <b>Done!</b>\n\n“${name}” is now running the latest Nova.`,
+    upd_fail: "❌ The update failed",
+    upd_expired: "This update session has expired. Tap 🔄 Update my panel and send your token again.",
+
+    // support us
+    btn_support: "💝 Support us",
+    support_title: "💝 <b>Support us</b>\n\nNova is free and always will be. If it helps you, you can support the project:",
+    support_notset: "💝 Support isn't set up yet. Please check back later.",
   },
 
   fa: {
@@ -151,6 +183,35 @@ export const STR = {
 
     nudge: "برای ساخت پنل نوا /install را بفرست، یا وقتی توکن Cloudflare را داشتی همین‌جا بچسبان.",
     banned: "🚫 دیگر به این ربات دسترسی نداری.",
+
+    join_text:
+      "📣 <b>اول عضو کانال ما شو</b>\n\nبرای استفاده از این ربات باید عضو کانال تلگرام ما باشی. عضو شو، بعد روی <b>عضو شدم</b> بزن.",
+    btn_join: "📣 عضویت در کانال",
+    btn_joined: "✅ عضو شدم",
+    join_no: "هنوز عضو نشده‌ای. اول عضو کانال شو، بعد دوباره بزن.",
+    join_ok: "✅ خوش آمدی!",
+
+    btn_update: "🔄 به‌روزرسانی پنل من",
+    upd_text:
+      "🔄 <b>به‌روزرسانی پنل من</b>\n\n" +
+      "پنل نوای فعلی‌ات را به آخرین نسخه به‌روز می‌کنم. تنظیمات، کاربران و داده‌هایت دست‌نخورده می‌مانند.\n\n" +
+      "<b>۱.</b> روی <b>گرفتن توکن</b> بزن و یک توکن بساز (همان مراحل نصب).\n" +
+      "<b>۲.</b> توکن را همین‌جا بچسبان. فقط چند دقیقه برای انجام به‌روزرسانی نگهش می‌دارم و بعد پاکش می‌کنم.",
+    upd_pick:
+      "🔄 <b>ورکر پنلت را انتخاب کن</b>\n\nاین‌ها ورکرهای حساب Cloudflare تو هستند. آن یکی که پنل نوایت را اجرا می‌کند انتخاب کن:",
+    upd_none: "هیچ ورکری در این حساب پیدا نکردم. اول با 🚀 نصب یک پنل بساز.",
+    upd_confirm: (name) =>
+      `⚠️ <b>«${name}» به‌روز شود؟</b>\n\nکد آن ورکر با آخرین نسخهٔ نوا جایگزین می‌شود. تنظیمات، کاربران و داده‌ها حفظ می‌شوند. فقط وقتی ادامه بده که این ورکر واقعاً پنل نوای تو باشد.`,
+    btn_upd_go: "✅ به‌روزرسانی کن",
+    btn_upd_cancel: "✖️ انصراف",
+    upd_run: "⏳ <b>در حال به‌روزرسانی…</b>",
+    upd_done: (name) => `✅ <b>انجام شد!</b>\n\n«${name}» حالا آخرین نسخهٔ نوا را اجرا می‌کند.`,
+    upd_fail: "❌ به‌روزرسانی ناموفق بود",
+    upd_expired: "این نشست به‌روزرسانی منقضی شد. روی 🔄 به‌روزرسانی پنل من بزن و دوباره توکن را بفرست.",
+
+    btn_support: "💝 حمایت از ما",
+    support_title: "💝 <b>حمایت از ما</b>\n\nنوا رایگان است و همیشه رایگان می‌ماند. اگر برایت مفید بوده، می‌توانی از پروژه حمایت کنی:",
+    support_notset: "💝 حمایت هنوز تنظیم نشده. لطفاً بعداً سر بزن.",
   },
 };
 
