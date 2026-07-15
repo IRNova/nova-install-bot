@@ -96,6 +96,9 @@ textarea{min-height:96px;resize:vertical;line-height:1.6}
 .switch{display:inline-flex;align-items:center;gap:9px;font-size:13px;color:var(--tx2);font-weight:600;cursor:pointer;margin-top:14px}
 .switch input{width:auto}
 .muted{color:var(--mu);font-size:12.5px}
+.note{background:color-mix(in srgb,var(--wn) 12%,transparent);border:1px solid color-mix(in srgb,var(--wn) 40%,transparent);
+ color:var(--tx2);border-radius:11px;padding:11px 13px;font-size:12.5px;line-height:1.65;margin:0 0 6px}
+.note b{color:var(--tx)}
 .hidden{display:none}
 .gstep{display:flex;gap:11px;padding:9px 0;font-size:13px;color:var(--tx2);line-height:1.75;border-top:1px solid var(--bd)}
 .gstep:first-of-type{border-top:none}
@@ -276,8 +279,9 @@ export const DASHBOARD_HTML = HEAD("Nova Bot Admin") + `<body>${THEME_BOOT}
    </div>
    <div class="card">
     <h2 data-k="chan">Required channel</h2>
-    <div class="desc" data-k="chan_d">Users must join this channel before they can use the bot. The bot must be an <b>admin</b> of the channel for the check to work; until it is, everyone is let through.</div>
-    <label class="switch" style="margin-top:0"><input type="checkbox" id="join_required"> <span data-k="chan_enable">Require channel membership</span></label>
+    <div class="desc" data-k="chan_d">Users must join this channel before they can use the bot.</div>
+    <div class="note" data-k="chan_note">⚠️ <b>The bot must be an admin of the channel</b> for this to work. Open the channel → Administrators → Add Admin → add <b>@IRNovaProxy_Bot</b> (no permissions needed). Until the bot is a channel admin, the check can't run and everyone is let through.</div>
+    <label class="switch"><input type="checkbox" id="join_required"> <span data-k="chan_enable">Require channel membership</span></label>
     <label data-k="chan_user">Channel username</label>
     <input id="join_channel" placeholder="irnova_proxy" dir="ltr">
     <div><button class="btn" onclick="saveConfig()" data-k="save">Save</button></div>
@@ -329,7 +333,7 @@ var I={en:{manage:'Manage',help:'Help',guide:'Guide',stats:'Stats',faq:'FAQ',sec
  sec_add:'Add a menu section',sec_add_d:"Adds a button to the bot's main menu with your text and an optional link.",s_t:'Button title',s_b:'Body (HTML allowed)',s_bt:'Link button text (optional)',s_bu:'Link URL (optional)',add_sec:'Add section',
  welcome:'Welcome message',welcome_d:'Shown at the top of the main menu. Leave blank for the default. Set each language separately.',save:'Save',
  contact:'Contact us',c_enable:'Enable "Contact us"',c_group:'Admin group chat ID',c_group_d:'Create a Telegram group, add <b>@IRNovaProxy_Bot</b> as an admin, send <code>/id</code> in the group, and paste the ID here. Reply to a forwarded message to answer that user.',show_faq:'Show FAQ in menu',
- chan:'Required channel',chan_d:'Users must join this channel before they can use the bot. The bot must be an <b>admin</b> of the channel for the check to work; until it is, everyone is let through.',chan_enable:'Require channel membership',chan_user:'Channel username',
+ chan:'Required channel',chan_d:'Users must join this channel before they can use the bot.',chan_note:'⚠️ <b>The bot must be an admin of the channel</b> for this to work. Open the channel → Administrators → Add Admin → add <b>@IRNovaProxy_Bot</b> (no permissions needed). Until the bot is a channel admin, the check can\\'t run and everyone is let through.',chan_enable:'Require channel membership',chan_user:'Channel username',
  sup:'Support us',sup_d:"Shown when a user taps 💝 Support us in the bot. If both fields are empty, the bot tells users support isn't set up yet.",sup_text:'Message (HTML allowed, e.g. wallet addresses in &lt;code&gt;)',sup_links:'Link buttons, one per line: Label | https://url',
  bc:'Broadcast',bc_d:'Send a message to everyone who has used the bot. HTML allowed. Sends in the background.',bc_send:'Send to all users',
  edit:'Edit',hide:'Hide',show:'Show',del:'Delete',hidden:'hidden',none_faq:'No questions yet.',none_sec:'No sections yet.',
@@ -345,7 +349,7 @@ fa:{manage:'مدیریت',help:'راهنما',guide:'راهنما',stats:'آما
  sec_add:'افزودن بخش منو',sec_add_d:'یک دکمه به منوی اصلی ربات با متن شما و یک لینک اختیاری اضافه می‌کند.',s_t:'عنوان دکمه',s_b:'متن (HTML مجاز)',s_bt:'متن دکمهٔ لینک (اختیاری)',s_bu:'آدرس لینک (اختیاری)',add_sec:'افزودن بخش',
  welcome:'پیام خوش‌آمد',welcome_d:'بالای منوی اصلی نشان داده می‌شود. برای پیش‌فرض خالی بگذار. هر زبان را جدا تنظیم کن.',save:'ذخیره',
  contact:'تماس با ما',c_enable:'فعال‌سازی «تماس با ما»',c_group:'آیدی گروه ادمین',c_group_d:'یک گروه تلگرام بساز، <b>@IRNovaProxy_Bot</b> را ادمین کن، در گروه <code>/id</code> بفرست و آیدی را اینجا بچسبان. برای پاسخ به کاربر، روی پیام فوروارد‌شده ریپلای کن.',show_faq:'نمایش سؤالات در منو',
- chan:'کانال اجباری',chan_d:'کاربران باید قبل از استفاده از ربات عضو این کانال شوند. برای کار کردن این بررسی، ربات باید <b>ادمین</b> کانال باشد؛ تا آن موقع همه عبور داده می‌شوند.',chan_enable:'اجباری بودن عضویت در کانال',chan_user:'یوزرنیم کانال',
+ chan:'کانال اجباری',chan_d:'کاربران باید قبل از استفاده از ربات عضو این کانال شوند.',chan_note:'⚠️ <b>ربات باید ادمین کانال باشد</b> تا این قابلیت کار کند. کانال → مدیران → افزودن مدیر → <b>@IRNovaProxy_Bot</b> را اضافه کن (نیازی به دسترسی نیست). تا وقتی ربات ادمین کانال نباشد، بررسی انجام نمی‌شود و همه عبور داده می‌شوند.',chan_enable:'اجباری بودن عضویت در کانال',chan_user:'یوزرنیم کانال',
  sup:'حمایت از ما',sup_d:'وقتی کاربر در ربات 💝 حمایت از ما را می‌زند نشان داده می‌شود. اگر هر دو فیلد خالی باشند، ربات به کاربران می‌گوید حمایت هنوز تنظیم نشده.',sup_text:'پیام (HTML مجاز، مثلاً آدرس کیف پول داخل <code>)',sup_links:'دکمه‌های لینک، هر خط یکی: عنوان | https://url',
  bc:'پیام همگانی',bc_d:'به همهٔ کسانی که از ربات استفاده کرده‌اند پیام بفرست. HTML مجاز است. در پس‌زمینه ارسال می‌شود.',bc_send:'ارسال به همه',
  edit:'ویرایش',hide:'پنهان',show:'نمایش',del:'حذف',hidden:'پنهان',none_faq:'هنوز سؤالی نیست.',none_sec:'هنوز بخشی نیست.',
