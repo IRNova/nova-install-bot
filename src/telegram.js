@@ -23,6 +23,19 @@ export function edit(env, chatId, messageId, text, extra = {}) {
   });
 }
 
+// Send a photo (by URL or file_id) with an HTML caption.
+export function sendPhoto(env, chatId, photo, caption, extra = {}) {
+  return tg(env, "sendPhoto", {
+    chat_id: chatId, photo, caption, parse_mode: "HTML", ...extra,
+  });
+}
+
+export function editCaption(env, chatId, messageId, caption, extra = {}) {
+  return tg(env, "editMessageCaption", {
+    chat_id: chatId, message_id: messageId, caption, parse_mode: "HTML", ...extra,
+  });
+}
+
 export function answerCb(env, id, text, showAlert) {
   return tg(env, "answerCallbackQuery", {
     callback_query_id: id, text: text || "", show_alert: !!showAlert,

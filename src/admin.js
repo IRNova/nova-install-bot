@@ -111,7 +111,7 @@ async function handleApi(request, env, ctx, res, method) {
   }
 
   // ── config ──
-  const CONFIG_KEYS = ["welcome", "welcome_en", "welcome_fa",
+  const CONFIG_KEYS = ["welcome", "welcome_en", "welcome_fa", "welcome_image",
     "contact_group_id", "contact_enabled", "faq_enabled",
     "join_required", "join_channel", "support_text", "support_links"];
   if (res === "config" && method === "GET") {

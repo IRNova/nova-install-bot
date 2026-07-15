@@ -275,6 +275,9 @@ export const DASHBOARD_HTML = HEAD("Nova Bot Admin") + `<body>${THEME_BOOT}
     <div class="desc" data-k="welcome_d">Shown at the top of the main menu. Leave blank for the default. Set each language separately.</div>
     <label>English</label><textarea id="welcome_en"></textarea>
     <label>فارسی</label><textarea id="welcome_fa" dir="rtl"></textarea>
+    <label data-k="w_img">Banner image URL (optional)</label>
+    <input id="welcome_image" dir="ltr" placeholder="https://novaproxy.online/og.png">
+    <div class="desc" style="margin-top:6px" data-k="w_img_d">Shown above the welcome text as a banner. Leave blank for a text-only menu. Max about 5&nbsp;MB, any public image URL.</div>
     <button class="btn" onclick="saveConfig()" data-k="save">Save</button>
    </div>
    <div class="card">
@@ -332,6 +335,7 @@ var I={en:{manage:'Manage',help:'Help',guide:'Guide',stats:'Stats',faq:'FAQ',sec
  faq_add:'Add a question',faq_add_d:'Shown as a tappable list in the bot. Answers support <b> <i> <a> <code>.',f_q:'Question',f_a:'Answer',order:'Order',add:'Add question',
  sec_add:'Add a menu section',sec_add_d:"Adds a button to the bot's main menu with your text and an optional link.",s_t:'Button title',s_b:'Body (HTML allowed)',s_bt:'Link button text (optional)',s_bu:'Link URL (optional)',add_sec:'Add section',
  welcome:'Welcome message',welcome_d:'Shown at the top of the main menu. Leave blank for the default. Set each language separately.',save:'Save',
+ w_img:'Banner image URL (optional)',w_img_d:'Shown above the welcome text as a banner. Leave blank for a text-only menu. Max about 5 MB, any public image URL.',
  contact:'Contact us',c_enable:'Enable "Contact us"',c_group:'Admin group chat ID',c_group_d:'Create a Telegram group, add <b>@IRNovaProxy_Bot</b> as an admin, send <code>/id</code> in the group, and paste the ID here. Reply to a forwarded message to answer that user.',show_faq:'Show FAQ in menu',
  chan:'Required channel',chan_d:'Users must join this channel before they can use the bot.',chan_note:'⚠️ <b>The bot must be an admin of the channel</b> for this to work. Open the channel → Administrators → Add Admin → add <b>@IRNovaProxy_Bot</b> (no permissions needed). Until the bot is a channel admin, the check can\\'t run and everyone is let through.',chan_enable:'Require channel membership',chan_user:'Channel username',
  sup:'Support us',sup_d:"Shown when a user taps 💝 Support us in the bot. If both fields are empty, the bot tells users support isn't set up yet.",sup_text:'Message (HTML allowed, e.g. wallet addresses in &lt;code&gt;)',sup_links:'Link buttons, one per line: Label | https://url',
@@ -348,6 +352,7 @@ fa:{manage:'مدیریت',help:'راهنما',guide:'راهنما',stats:'آما
  faq_add:'افزودن سؤال',faq_add_d:'به‌صورت فهرست قابل‌لمس در ربات نشان داده می‌شود. پاسخ‌ها از <b> <i> <a> <code> پشتیبانی می‌کنند.',f_q:'سؤال',f_a:'پاسخ',order:'ترتیب',add:'افزودن سؤال',
  sec_add:'افزودن بخش منو',sec_add_d:'یک دکمه به منوی اصلی ربات با متن شما و یک لینک اختیاری اضافه می‌کند.',s_t:'عنوان دکمه',s_b:'متن (HTML مجاز)',s_bt:'متن دکمهٔ لینک (اختیاری)',s_bu:'آدرس لینک (اختیاری)',add_sec:'افزودن بخش',
  welcome:'پیام خوش‌آمد',welcome_d:'بالای منوی اصلی نشان داده می‌شود. برای پیش‌فرض خالی بگذار. هر زبان را جدا تنظیم کن.',save:'ذخیره',
+ w_img:'آدرس تصویر بنر (اختیاری)',w_img_d:'به‌عنوان بنر بالای متن خوش‌آمد نشان داده می‌شود. برای منوی فقط‌متنی خالی بگذار. حداکثر حدود ۵ مگابایت، هر آدرس تصویر عمومی.',
  contact:'تماس با ما',c_enable:'فعال‌سازی «تماس با ما»',c_group:'آیدی گروه ادمین',c_group_d:'یک گروه تلگرام بساز، <b>@IRNovaProxy_Bot</b> را ادمین کن، در گروه <code>/id</code> بفرست و آیدی را اینجا بچسبان. برای پاسخ به کاربر، روی پیام فوروارد‌شده ریپلای کن.',show_faq:'نمایش سؤالات در منو',
  chan:'کانال اجباری',chan_d:'کاربران باید قبل از استفاده از ربات عضو این کانال شوند.',chan_note:'⚠️ <b>ربات باید ادمین کانال باشد</b> تا این قابلیت کار کند. کانال → مدیران → افزودن مدیر → <b>@IRNovaProxy_Bot</b> را اضافه کن (نیازی به دسترسی نیست). تا وقتی ربات ادمین کانال نباشد، بررسی انجام نمی‌شود و همه عبور داده می‌شوند.',chan_enable:'اجباری بودن عضویت در کانال',chan_user:'یوزرنیم کانال',
  sup:'حمایت از ما',sup_d:'وقتی کاربر در ربات 💝 حمایت از ما را می‌زند نشان داده می‌شود. اگر هر دو فیلد خالی باشند، ربات به کاربران می‌گوید حمایت هنوز تنظیم نشده.',sup_text:'پیام (HTML مجاز، مثلاً آدرس کیف پول داخل <code>)',sup_links:'دکمه‌های لینک، هر خط یکی: عنوان | https://url',
@@ -524,10 +529,12 @@ function toggleSection(id,en){var s=window._sec.find(x=>x.id===id);api('PUT','se
 function delSection(id){if(!confirm(T('confirm_del')))return;api('DELETE','sections',{id}).then(()=>{toast(T('deleted'));loadSections()})}
 
 async function loadConfig(){var c=await api('GET','config');welcome_en.value=c.welcome_en||c.welcome||'';welcome_fa.value=c.welcome_fa||'';
+ welcome_image.value=c.welcome_image||'';
  contact_group_id.value=c.contact_group_id||'';contact_enabled.checked=c.contact_enabled!=='0';faq_enabled.checked=c.faq_enabled!=='0';
  join_required.checked=c.join_required!=='0';join_channel.value=c.join_channel||'';
  support_text.value=c.support_text||'';support_links.value=c.support_links||''}
 async function saveConfig(){await api('POST','config',{welcome_en:welcome_en.value,welcome_fa:welcome_fa.value,
+ welcome_image:welcome_image.value.trim(),
  contact_group_id:contact_group_id.value.trim(),contact_enabled:contact_enabled.checked?'1':'0',faq_enabled:faq_enabled.checked?'1':'0',
  join_required:join_required.checked?'1':'0',join_channel:join_channel.value.trim().replace(/^@/,'').replace(/^https?:\\/\\/t\\.me\\//i,''),
  support_text:support_text.value,support_links:support_links.value});toast(T('saved'))}
