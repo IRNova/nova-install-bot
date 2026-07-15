@@ -115,7 +115,7 @@ async function handleApi(request, env, ctx, res, method) {
   const CONFIG_KEYS = ["welcome", "welcome_en", "welcome_fa", "welcome_image",
     "contact_group_id", "contact_enabled", "faq_enabled",
     "join_required", "join_channel", "support_text", "support_links",
-    "ai_enabled", "ai_model"];
+    "ai_enabled", "ai_model", "ai_cf_model"];
   if (res === "config" && method === "GET") {
     const out = {};
     for (const k of CONFIG_KEYS) out[k] = await getConfig(env, k, "");
@@ -131,7 +131,7 @@ async function handleApi(request, env, ctx, res, method) {
   // ── faq ──
   // Draft FAQ entries from real support questions (inserted disabled for review).
   if (res === "faq-suggest" && method === "POST") {
-    if (!env.ANTHROPIC_API_KEY) return json({ error: "no_api_key" }, 400);
+    if (!env.ANTHROPIC_API_KEY && !env.AI) return json({ error: "no_ai" }, 400);
     try {
       const drafts = await suggestFaqs(env);
       return json({ ok: true, added: drafts.length });
