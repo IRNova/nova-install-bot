@@ -44,6 +44,8 @@ CREATE TABLE IF NOT EXISTS config (
 CREATE TABLE IF NOT EXISTS contact_map (
   group_msg_id  INTEGER PRIMARY KEY,     -- message id of the copy in the admin group
   user_id       INTEGER NOT NULL,
+  card_msg_id   INTEGER,                 -- the card this row's message belongs to (self for cards)
+  replied       INTEGER DEFAULT 0,       -- 1 once an admin's reply was delivered
   created_at    TEXT DEFAULT (datetime('now'))
 );
 
@@ -52,4 +54,8 @@ INSERT OR IGNORE INTO config (key, value) VALUES
   ('welcome', ''),
   ('contact_group_id', ''),
   ('contact_enabled', '1'),
-  ('faq_enabled', '1');
+  ('faq_enabled', '1'),
+  ('join_required', '1'),
+  ('join_channel', 'irnova_proxy'),
+  ('support_text', ''),
+  ('support_links', '');
