@@ -58,4 +58,5 @@ INSERT OR IGNORE INTO config (key, value) VALUES
   ('join_required', '1'),
   ('join_channel', 'irnova_proxy'),
   ('support_text', ''),
-  ('support_links', '');
+  ('support_links', ''),
+  ('welcome_image', 'https://novaproxy.online/og.png');

@@ -1,7 +1,7 @@
 // Update router: commands, main menu, FAQ, dynamic sections, contact flow.
 // Every user-facing string goes through i18n (English + Persian).
 
-import { tg, send, edit, answerCb, deleteMessage, esc } from "./telegram.js";
+import { tg, send, edit, sendPhoto, editCaption, answerCb, deleteMessage, esc } from "./telegram.js";
 import {
   touchUser, getConfig, setConfig, listFaq, getFaq, listSections, getSection,
   markBlocked, getUserLang, setUserLang, isBanned, setBanned,
@@ -172,11 +172,33 @@ async function menuText(env, from, lang) {
 }
 
 async function sendMenu(env, chatId, from, lang) {
-  return send(env, chatId, await menuText(env, from, lang), { reply_markup: await menuMarkup(env, lang) });
+  const text = await menuText(env, from, lang);
+  const markup = await menuMarkup(env, lang);
+  const img = (await getConfig(env, "welcome_image", "https://novaproxy.online/og.png")).trim();
+  if (img) {
+    const r = await sendPhoto(env, chatId, img, text, { reply_markup: markup });
+    if (r && r.ok) return r;
+    // Bad / unreachable image URL: fall back to text so the menu still shows.
+  }
+  return send(env, chatId, text, { reply_markup: markup });
 }
 
 async function replaceWithMenu(env, chatId, msgId, from, lang) {
-  return edit(env, chatId, msgId, await menuText(env, from, lang), { reply_markup: await menuMarkup(env, lang) });
+  return showView(env, chatId, msgId, await menuText(env, from, lang), { reply_markup: await menuMarkup(env, lang) });
+}
+
+// Update a menu view in place. When the menu was sent with a banner photo, the
+// content lives in the caption, so we edit the caption; a plain-text menu is
+// edited as text. We try caption first (banner is on by default) and fall back
+// to a text edit, then to replacing the message if the content is too long for
+// a caption (Telegram caps captions at 1024 chars).
+async function showView(env, chatId, msgId, text, extra = {}) {
+  let r = await editCaption(env, chatId, msgId, text, extra);
+  if (r && r.ok) return r;
+  r = await edit(env, chatId, msgId, text, extra);
+  if (r && r.ok) return r;
+  await deleteMessage(env, chatId, msgId);
+  return send(env, chatId, text, extra);
 }
 
 function backRow(lang) {
@@ -265,7 +287,7 @@ async function handleCallback(cb, env) {
   const gate = await requireMember(env, cb.from.id);
   if (!gate.ok) {
     await answerCb(env, cb.id);
-    return edit(env, chatId, msgId, t(lang, "join_text"), { reply_markup: joinKeyboard(lang, gate.chan) });
+    return showView(env, chatId, msgId, t(lang, "join_text"), { reply_markup: joinKeyboard(lang, gate.chan) });
   }
 
   await answerCb(env, cb.id);
@@ -275,12 +297,12 @@ async function handleCallback(cb, env) {
   if (data === "install") {
     await setConfig(env, `await_token_${cb.from.id}`, "1");
     await setConfig(env, `await_utoken_${cb.from.id}`, "");
-    return edit(env, chatId, msgId, t(lang, "install_text"), { reply_markup: installKeyboard(lang, true) });
+    return showView(env, chatId, msgId, t(lang, "install_text"), { reply_markup: installKeyboard(lang, true) });
   }
   if (data === "update") {
     await setConfig(env, `await_utoken_${cb.from.id}`, "1");
     await setConfig(env, `await_token_${cb.from.id}`, "");
-    return edit(env, chatId, msgId, t(lang, "upd_text"), { reply_markup: updateKeyboard(lang) });
+    return showView(env, chatId, msgId, t(lang, "upd_text"), { reply_markup: updateKeyboard(lang) });
   }
   if (data === "updx") {
     await clearUpdCtx(env, cb.from.id);
@@ -304,7 +326,7 @@ async function handleCallback(cb, env) {
   if (data.startsWith("updg:")) return runUpdate(env, chatId, msgId, cb.from.id, +data.slice(5), lang);
   if (data === "support") return editSupport(env, chatId, msgId, lang);
   if (data === "apps")
-    return edit(env, chatId, msgId, t(lang, "apps_title"), { reply_markup: appsKeyboard(lang) });
+    return showView(env, chatId, msgId, t(lang, "apps_title"), { reply_markup: appsKeyboard(lang) });
   if (data === "faq") return editFaqList(env, chatId, msgId, lang);
   if (data === "contact") { await startContact(env, chatId, cb.from.id, lang); return; }
   if (data.startsWith("faq:")) return editFaqAnswer(env, chatId, msgId, +data.slice(4), lang);
@@ -346,11 +368,11 @@ async function editSupport(env, chatId, msgId, lang) {
     if (label && /^(https?|tg):\/\//i.test(url)) rows.push([{ text: label, url, style: "success" }]);
   }
   if (!body && !rows.length) {
-    return edit(env, chatId, msgId, t(lang, "support_notset"),
+    return showView(env, chatId, msgId, t(lang, "support_notset"),
       { reply_markup: { inline_keyboard: [backRow(lang)] } });
   }
   rows.push(backRow(lang));
-  return edit(env, chatId, msgId, t(lang, "support_title") + (body ? "\n\n" + body : ""),
+  return showView(env, chatId, msgId, t(lang, "support_title") + (body ? "\n\n" + body : ""),
     { reply_markup: { inline_keyboard: rows } });
 }
 
@@ -380,13 +402,13 @@ async function sendFaqList(env, chatId, lang) {
 }
 async function editFaqList(env, chatId, msgId, lang) {
   const { text, markup } = await faqListMarkup(env, lang);
-  return edit(env, chatId, msgId, text, { reply_markup: markup });
+  return showView(env, chatId, msgId, text, { reply_markup: markup });
 }
 async function editFaqAnswer(env, chatId, msgId, id, lang) {
   const f = await getFaq(env, id);
   if (!f) return editFaqList(env, chatId, msgId, lang);
   const text = `❓ <b>${esc(f.question)}</b>\n\n${f.answer}`;
-  return edit(env, chatId, msgId, text, {
+  return showView(env, chatId, msgId, text, {
     reply_markup: { inline_keyboard: [[{ text: t(lang, "btn_back_faq"), callback_data: "faq" }], backRow(lang)] },
   });
 }
@@ -399,7 +421,7 @@ async function editSection(env, chatId, msgId, id, lang) {
   const rows = [];
   if (s.button_text && s.button_url) rows.push([{ text: s.button_text, url: s.button_url }]);
   rows.push(backRow(lang));
-  return edit(env, chatId, msgId, `<b>${esc(s.title)}</b>\n\n${s.body}`, {
+  return showView(env, chatId, msgId, `<b>${esc(s.title)}</b>\n\n${s.body}`, {
     reply_markup: { inline_keyboard: rows },
   });
 }
