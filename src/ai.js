@@ -1,14 +1,18 @@
 // AI support: auto-answer user questions from a knowledge pack (Nova reference
 // doc + FAQ + past human answers), and draft FAQ entries from real questions.
 //
-// Secret (wrangler secret put): ANTHROPIC_API_KEY. Without it every entry
-// point here reports "disabled" and the bot falls back to human support.
+// Provider selection is automatic:
+//   • ANTHROPIC_API_KEY secret set  → Claude (best Persian quality, paid)
+//   • otherwise                     → Cloudflare Workers AI (free, 10,000
+//                                     neurons/day included, no key needed)
+// With neither available, every entry point reports "disabled" and the bot
+// falls back to human support.
 
 import Anthropic from "@anthropic-ai/sdk";
 import { getConfig, listFaq, listAnsweredQa } from "./db.js";
 
 export async function aiEnabled(env) {
-  if (!env.ANTHROPIC_API_KEY) return false;
+  if (!env.ANTHROPIC_API_KEY && !env.AI) return false;
   return (await getConfig(env, "ai_enabled", "1")) === "1";
 }
 
@@ -18,6 +22,40 @@ function client(env) {
 
 async function model(env) {
   return (await getConfig(env, "ai_model", "claude-opus-4-8")).trim() || "claude-opus-4-8";
+}
+
+async function cfModel(env) {
+  return (await getConfig(env, "ai_cf_model", "@cf/meta/llama-3.3-70b-instruct-fp8-fast")).trim() ||
+    "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+}
+
+// One JSON-constrained completion via whichever provider is available.
+// Returns the parsed object, or null when the provider refused / misbehaved.
+async function runJson(env, { system, user, schema, maxTokens = 1024, effort = "low" }) {
+  if (env.ANTHROPIC_API_KEY) {
+    const response = await client(env).messages.create({
+      model: await model(env),
+      max_tokens: maxTokens,
+      output_config: { effort, format: { type: "json_schema", schema } },
+      system: [{ type: "text", text: system, cache_control: { type: "ephemeral" } }],
+      messages: [{ role: "user", content: user }],
+    });
+    if (response.stop_reason === "refusal") return null;
+    const text = response.content.find((b) => b.type === "text");
+    return text && text.text ? JSON.parse(text.text) : null;
+  }
+  // Free path: Workers AI with JSON-schema constrained output.
+  const r = await env.AI.run(await cfModel(env), {
+    messages: [
+      { role: "system", content: system },
+      { role: "user", content: user },
+    ],
+    response_format: { type: "json_schema", json_schema: schema },
+    max_tokens: maxTokens,
+  });
+  const out = r && r.response;
+  if (out == null) return null;
+  return typeof out === "string" ? JSON.parse(out) : out;
 }
 
 // Static reference about Nova. Kept compact on purpose: this plus the FAQ and
@@ -93,39 +131,27 @@ async function knowledgePack(env) {
 export async function autoAnswer(env, question, lang) {
   const kb = await knowledgePack(env);
   const language = lang === "fa" ? "Persian (Farsi)" : lang === "ru" ? "Russian" : "English";
-  const response = await client(env).messages.create({
-    model: await model(env),
-    max_tokens: 1024,
-    output_config: { effort: "low", format: { type: "json_schema", schema: ANSWER_SCHEMA } },
-    system: [
-      {
-        type: "text",
-        text:
-          "You are the support assistant for the Nova Proxy Telegram bot. " +
-          "Answer ONLY from the knowledge pack below. Rules:\n" +
-          "- Set confident=false when the question is not clearly covered, involves account " +
-          "security, payments, lost data, legal topics, a bug report, or an angry/frustrated user. " +
-          "A human will take over; do not guess.\n" +
-          "- Never invent URLs, commands, or facts. Only use links that appear in the knowledge pack.\n" +
-          "- Never ask the user to share their Cloudflare token, password, or subscription link in chat " +
-          "beyond what the bot's own install/update flow does.\n" +
-          "- Keep answers under 900 characters, friendly and concrete. Telegram HTML only: " +
-          "<b>, <i>, <code>, <a href>. No markdown.\n" +
-          "- If the user should use a bot feature, name the exact button (for example the install " +
-          "or update button on the /start menu).\n\n" +
-          "KNOWLEDGE PACK:\n" + kb,
-        cache_control: { type: "ephemeral" },
-      },
-    ],
-    messages: [
-      { role: "user", content: `User language: ${language}. Reply in that language.\n\nQuestion:\n${question}` },
-    ],
+  const out = await runJson(env, {
+    schema: ANSWER_SCHEMA,
+    maxTokens: 1024,
+    effort: "low",
+    system:
+      "You are the support assistant for the Nova Proxy Telegram bot. " +
+      "Answer ONLY from the knowledge pack below. Rules:\n" +
+      "- Set confident=false when the question is not clearly covered, involves account " +
+      "security, payments, lost data, legal topics, a bug report, or an angry/frustrated user. " +
+      "A human will take over; do not guess.\n" +
+      "- Never invent URLs, commands, or facts. Only use links that appear in the knowledge pack.\n" +
+      "- Never ask the user to share their Cloudflare token, password, or subscription link in chat " +
+      "beyond what the bot's own install/update flow does.\n" +
+      "- Keep answers under 900 characters, friendly and concrete. Telegram HTML only: " +
+      "<b>, <i>, <code>, <a href>. No markdown.\n" +
+      "- If the user should use a bot feature, name the exact button (for example the install " +
+      "or update button on the /start menu).\n\n" +
+      "KNOWLEDGE PACK:\n" + kb,
+    user: `User language: ${language}. Reply in that language.\n\nQuestion:\n${question}`,
   });
-  if (response.stop_reason === "refusal") return null;
-  const text = response.content.find((b) => b.type === "text");
-  if (!text || !text.text) return null;
-  const out = JSON.parse(text.text);
-  if (typeof out.confident !== "boolean" || typeof out.answer !== "string") return null;
+  if (!out || typeof out.confident !== "boolean" || typeof out.answer !== "string") return null;
   return out;
 }
 
@@ -155,10 +181,10 @@ export async function suggestFaqs(env) {
   const recent = await listAnsweredQa(env, { limit: 100 });
   if (!recent.length) return [];
   const existing = await listFaq(env, false).catch(() => []);
-  const response = await client(env).messages.create({
-    model: await model(env),
-    max_tokens: 4096,
-    output_config: { format: { type: "json_schema", schema: FAQ_SCHEMA } },
+  const out = await runJson(env, {
+    schema: FAQ_SCHEMA,
+    maxTokens: 4096,
+    effort: "high",
     system:
       "You maintain the FAQ of the Nova Proxy support bot (a free self-hosted proxy panel " +
       "for censored networks). From the real support exchanges provided, draft NEW FAQ entries:\n" +
@@ -168,21 +194,13 @@ export async function suggestFaqs(env) {
       "short and the answer complete but tight. Telegram HTML only: <b>, <i>, <code>, <a href>.\n" +
       "- Prefer answers the human team gave; never invent facts or links.\n" +
       "- Return at most 6 entries. Return an empty list if nothing new is worth adding.",
-    messages: [
-      {
-        role: "user",
-        content:
-          "Existing FAQ questions (do not duplicate):\n" +
-          (existing.map((f) => "- " + f.question).join("\n") || "(none)") +
-          "\n\nRecent support exchanges (Q = user, A = answer, [ai] = answered by the assistant):\n" +
-          recent.map((r) => `Q: ${r.question}\nA${r.source === "ai" ? " [ai]" : ""}: ${r.answer}`).join("\n---\n"),
-      },
-    ],
+    user:
+      "Existing FAQ questions (do not duplicate):\n" +
+      (existing.map((f) => "- " + f.question).join("\n") || "(none)") +
+      "\n\nRecent support exchanges (Q = user, A = answer, [ai] = answered by the assistant):\n" +
+      recent.map((r) => `Q: ${r.question}\nA${r.source === "ai" ? " [ai]" : ""}: ${r.answer}`).join("\n---\n"),
   });
-  const text = response.content.find((b) => b.type === "text");
-  if (!text || !text.text) return [];
-  const out = JSON.parse(text.text);
-  const drafts = Array.isArray(out.faqs) ? out.faqs.filter((f) => f.question && f.answer) : [];
+  const drafts = out && Array.isArray(out.faqs) ? out.faqs.filter((f) => f.question && f.answer) : [];
   for (const f of drafts) {
     await env.DB.prepare(
       "INSERT INTO faq (question, answer, position, enabled) VALUES (?, ?, 999, 0)"

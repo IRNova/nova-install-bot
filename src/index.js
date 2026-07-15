@@ -10,6 +10,7 @@
 import { handleUpdate } from "./bot.js";
 import { handleAdmin } from "./admin.js";
 import { BANNER_JPEG_B64 } from "./banner.js";
+import { autoAnswer } from "./ai.js";
 
 let bannerBytes = null;
 function getBanner() {
@@ -38,6 +39,21 @@ export default {
           "Cache-Control": "public, max-age=86400",
         },
       });
+    }
+
+    // AI self-test for `wrangler dev` sessions. Only reachable when BOT_TOKEN
+    // is absent, which is never true in production, so this is dev-only.
+    if (request.method === "GET" && url.pathname === "/ai-selftest" && !env.BOT_TOKEN) {
+      const q = url.searchParams.get("q") || "How do I install my panel?";
+      const lang = url.searchParams.get("lang") || "en";
+      try {
+        const r = await autoAnswer(env, q, lang);
+        return new Response(JSON.stringify(r, null, 2), {
+          headers: { "Content-Type": "application/json;charset=utf-8" },
+        });
+      } catch (e) {
+        return new Response("error: " + (e && e.message), { status: 500 });
+      }
     }
 
     if (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) {
