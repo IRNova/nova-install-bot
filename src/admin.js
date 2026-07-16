@@ -1,9 +1,11 @@
 // Web admin panel: cookie-auth login, a dashboard, JSON CRUD APIs, broadcast.
 // All routes live under /admin. Auth = an HMAC-signed cookie keyed on ADMIN_PASSWORD.
 
-import { tg, send } from "./telegram.js";
-import { getConfig, setConfig, listFaq, listSections, stats, overview, markBlocked, listUsers, setBanned } from "./db.js";
+import { tg, send, esc } from "./telegram.js";
+import { getConfig, setConfig, listFaq, listSections, stats, overview, markBlocked, listUsers, setBanned, getQa, getUserLang, setQaAnswer, isBanned } from "./db.js";
 import { suggestFaqs } from "./ai.js";
+import { contactKb } from "./bot.js";
+import { t } from "./i18n.js";
 import { DASHBOARD_HTML, LOGIN_HTML } from "./admin_ui.js";
 
 const COOKIE = "nova_admin";
@@ -102,6 +104,40 @@ async function handleApi(request, env, ctx, res, method) {
   // Richer payload for the Overview pane: counters + 14-day series + recent Q&A.
   if (res === "overview" && method === "GET") {
     return json(await overview(env));
+  }
+
+  // Answer a support question straight from the panel: deliver via the bot in
+  // the user's language, record it as the human answer (the AI learns from
+  // it), and flip any Telegram group cards for this question to "Replied".
+  if (res === "qa-reply" && method === "POST") {
+    const id = Number(body.id);
+    const text = String(body.text || "").trim();
+    if (!id || !text) return json({ error: "empty" }, 400);
+    const qa = await getQa(env, id).catch(() => null);
+    if (!qa || !qa.user_id) return json({ error: "not_found" }, 404);
+    const lang = (await getUserLang(env, qa.user_id)) || qa.lang || "en";
+    const r = await send(env, qa.user_id, `${t(lang, "reply_prefix")}\n\n${esc(text)}`);
+    if (!r || r.ok === false) {
+      if (r && r.error_code === 403) await markBlocked(env, qa.user_id).catch(() => {});
+      return json({ error: "undeliverable" }, 502);
+    }
+    await setQaAnswer(env, id, text, "human");
+    const group = await getConfig(env, "contact_group_id", "");
+    const banned = await isBanned(env, qa.user_id).catch(() => false);
+    const { results } = await env.DB.prepare(
+      "SELECT group_msg_id, card_msg_id FROM contact_map WHERE qa_id = ?"
+    ).bind(id).all().catch(() => ({ results: [] }));
+    for (const row of results || []) {
+      await env.DB.prepare("UPDATE contact_map SET replied = 1 WHERE group_msg_id = ?")
+        .bind(row.group_msg_id).run().catch(() => {});
+      if (group && row.group_msg_id === row.card_msg_id) {
+        await tg(env, "editMessageReplyMarkup", {
+          chat_id: group, message_id: row.group_msg_id,
+          reply_markup: contactKb(qa.user_id, banned, true),
+        }).catch(() => {});
+      }
+    }
+    return json({ ok: true });
   }
 
   // ── users / ban ──
