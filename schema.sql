@@ -60,6 +60,7 @@ CREATE TABLE IF NOT EXISTS qa_log (
   answer      TEXT,                        -- null until answered
   source      TEXT,                        -- 'ai' | 'human' | 'approved' (AI draft a human sent)
   draft       TEXT,                        -- AI-drafted reply awaiting review (draft mode)
+  draft_sure  INTEGER,                     -- 1 = model was confident, 0 = unsure, warn the reviewer
   resolved    INTEGER DEFAULT 0,           -- 1 when the user tapped "Solved"
   created_at  TEXT DEFAULT (datetime('now')),
   answered_at TEXT

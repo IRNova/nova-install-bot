@@ -123,9 +123,10 @@ export async function setQaAnswerByCard(env, cardMsgId, answer) {
   ).bind(answer, cardMsgId).run();
 }
 
-export async function setQaDraft(env, qaId, draft) {
+export async function setQaDraft(env, qaId, draft, sure) {
   if (!qaId) return;
-  await env.DB.prepare("UPDATE qa_log SET draft = ? WHERE id = ?").bind(draft, qaId).run();
+  await env.DB.prepare("UPDATE qa_log SET draft = ?, draft_sure = ? WHERE id = ?")
+    .bind(draft, sure ? 1 : 0, qaId).run();
 }
 
 export async function markQaResolved(env, qaId) {
@@ -183,7 +184,7 @@ export async function overview(env) {
   // Latest support questions, newest first. Questions are untrusted user text;
   // ship a trimmed snippet only, the panel escapes it before rendering.
   const { results: recentRows } = await env.DB.prepare(
-    "SELECT id, question, answer, lang, source, draft, created_at FROM qa_log ORDER BY id DESC LIMIT 8"
+    "SELECT id, question, answer, lang, source, draft, draft_sure, created_at FROM qa_log ORDER BY id DESC LIMIT 8"
   ).all().catch(() => ({ results: [] }));
   const recent = (recentRows || []).map((r) => {
     const answered = !!(r.answer && r.answer !== "");
@@ -193,6 +194,7 @@ export async function overview(env) {
       lang: r.lang || "en",
       status: !answered ? "waiting" : r.source === "ai" ? "ai" : "human",
       draft: !answered && r.draft ? String(r.draft).slice(0, 500) : "",
+      draft_sure: r.draft_sure === 1,
       created_at: r.created_at,
     };
   });

@@ -516,8 +516,8 @@ export function contactKb(userId, banned, replied, draftQaId = null) {
 // user directly when confident. In 'draft' mode (human in the loop, the default
 // until the knowledge base matures) the AI only saves a draft; the question is
 // forwarded to the admins, who send or edit the draft from the group card or
-// the panel. Anything else (AI off, no provider, API error, low confidence)
-// goes to the admin group exactly as before.
+// the panel. Anything else (AI off, no provider, API error) goes to the admin
+// group exactly as before, with no draft attached.
 async function handleContactMessage(env, from, chatId, msg, lang) {
   const question = (msg.text || "").trim();
   const qaId = question ? await logQuestion(env, from.id, lang, question).catch(() => null) : null;
@@ -531,21 +531,36 @@ async function handleContactMessage(env, from, chatId, msg, lang) {
       // webhook response), then attach the AI draft to the card once ready.
       const fw = await forwardContact(env, from, chatId, msg, lang, { qaId });
       const r = await Promise.race([
-        autoAnswer(env, question, lang).catch(() => null),
+        autoAnswer(env, question, lang).catch((e) => {
+          console.log("ai: draft failed for qa", qaId, e && e.message);
+          return null;
+        }),
         new Promise((res) => setTimeout(() => res(null), 20000)),
       ]);
-      if (!(r && r.confident && r.answer)) {
-        console.log("ai: no confident draft in time for qa", qaId);
+      if (!(r && r.answer)) {
+        console.log("ai: no draft for qa", qaId, "(model error or timeout)");
         return;
       }
-      await setQaDraft(env, qaId, r.answer).catch(() => {});
+      // A human reads every draft here, so keep the unsure ones too: they are
+      // still a head start to edit. The model's confidence flag is noisy, so it
+      // only decides how loudly the card warns the reviewer, never whether the
+      // draft exists. (In auto mode below, it still gates sending outright.)
+      const sure = r.confident === true;
+      console.log("ai: draft saved for qa", qaId, sure ? "(confident)" : "(unsure)");
+      await setQaDraft(env, qaId, r.answer, sure).catch(() => {});
       const group = await getConfig(env, "contact_group_id", "");
       if (group && fw && fw.cardMsgId) {
+        const header = sure
+          ? "🤖 <b>AI draft</b> / پیش‌نویس:"
+          : "🤖 <b>AI draft</b> / پیش‌نویس\n⚠️ <i>The model was unsure, check it before sending / مدل مطمئن نبود، قبل از ارسال بررسی کنید</i>";
+        const btn = sure
+          ? "🤖 Send AI draft / ارسال پیش‌نویس"
+          : "⚠️ Send anyway / با این حال ارسال کن";
         const sent = await send(env, group,
-          `🤖 <b>AI draft</b> / پیش‌نویس:\n<blockquote>${esc(r.answer)}</blockquote>`, {
+          `${header}\n<blockquote>${esc(r.answer)}</blockquote>`, {
             reply_to_message_id: fw.cardMsgId,
             reply_markup: { inline_keyboard: [[
-              { text: "🤖 Send AI draft / ارسال پیش‌نویس", callback_data: `dok:${qaId}`, style: "success" },
+              { text: btn, callback_data: `dok:${qaId}`, style: sure ? "success" : "primary" },
             ]] },
           });
         if (sent && sent.result && sent.result.message_id) {
