@@ -2,7 +2,7 @@
 // All routes live under /admin. Auth = an HMAC-signed cookie keyed on ADMIN_PASSWORD.
 
 import { tg, send } from "./telegram.js";
-import { getConfig, setConfig, listFaq, listSections, stats, markBlocked, listUsers, setBanned } from "./db.js";
+import { getConfig, setConfig, listFaq, listSections, stats, overview, markBlocked, listUsers, setBanned } from "./db.js";
 import { suggestFaqs } from "./ai.js";
 import { DASHBOARD_HTML, LOGIN_HTML } from "./admin_ui.js";
 
@@ -97,6 +97,11 @@ async function handleApi(request, env, ctx, res, method) {
 
   if (res === "stats" && method === "GET") {
     return json(await stats(env));
+  }
+
+  // Richer payload for the Overview pane: counters + 14-day series + recent Q&A.
+  if (res === "overview" && method === "GET") {
+    return json(await overview(env));
   }
 
   // ── users / ban ──

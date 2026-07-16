@@ -9,14 +9,14 @@ const STYLE = `
  --bg:#f4f6fb;--panel:#ffffff;--card:#ffffff;--card2:#f7f9fc;--bd:#e6eaf1;--bd2:#dde2eb;
  --tx:#101622;--tx2:#3a465c;--mu:#5f6a7d;--ac:#0ea5c4;--ac2:#7c3aed;
  --grad:linear-gradient(120deg,#0891b2,#7c3aed);--ring:rgba(8,145,178,.25);
- --ok:#047857;--dg:#dc2626;--wn:#b45309;
+ --ok:#047857;--dg:#dc2626;--wn:#b45309;--ch1:#0891b2;--ch2:#7c3aed;
  --shadow:0 1px 2px rgba(20,40,80,.04),0 10px 28px rgba(40,60,110,.10);
  --ac-soft:color-mix(in srgb,var(--ac) 12%,transparent);--radius:12px;--sidebar:252px}
 html[data-theme=dark]{
  --bg:#070809;--panel:#0c0e12;--card:#101319;--card2:#0b0d11;--bd:#1c2027;--bd2:#262b34;
  --tx:#e9edf4;--tx2:#aeb6c4;--mu:#6f7888;--ac:#22d3ee;--ac2:#a855f7;
  --grad:linear-gradient(120deg,#22d3ee,#7c5cff);--ring:rgba(34,211,238,.30);
- --ok:#34d399;--dg:#f87171;--wn:#f5b042;
+ --ok:#34d399;--dg:#f87171;--wn:#f5b042;--ch1:#0891b2;--ch2:#a855f7;
  --shadow:0 1px 0 rgba(255,255,255,.02),0 12px 30px rgba(0,0,0,.45);
  --ac-soft:color-mix(in srgb,var(--ac) 15%,transparent)}
 *{box-sizing:border-box;margin:0;padding:0}
@@ -80,11 +80,52 @@ textarea{min-height:96px;resize:vertical;line-height:1.6}
 .row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 
-/* Stats */
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px}
+/* Overview */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;margin:0 0 14px}
 .stat{background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:18px;box-shadow:var(--shadow)}
 .stat .n{font-size:2rem;font-weight:800;line-height:1;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
 .stat .l{color:var(--mu);font-size:12px;margin-top:8px;font-weight:600}
+.stat .sub{color:var(--mu);font-size:11.5px;margin-top:7px;line-height:1.5}
+.stat .sub b{color:var(--tx2);font-weight:600}
+.ovbar{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 14px}
+.statrow{display:grid;grid-template-columns:repeat(4,1fr);background:var(--card);border:1px solid var(--bd);border-radius:16px;padding:6px 0;box-shadow:var(--shadow);margin:0 0 16px}
+.mini{padding:11px 18px;border-inline-start:1px solid var(--bd)}
+.mini:first-child{border-inline-start:none}
+.mini .v{font-size:17px;font-weight:800;letter-spacing:-.2px}
+.mini .v small{font-size:11.5px;font-weight:600;color:var(--mu);margin-inline-start:5px;letter-spacing:0}
+.mini .k{font-size:11px;color:var(--mu);font-weight:600;margin-top:3px}
+.legend{display:flex;align-items:center;gap:18px;margin:2px 0 14px;font-size:12px;color:var(--tx2);font-weight:600;flex-wrap:wrap}
+.legend .sw{display:inline-block;width:10px;height:10px;border-radius:3px;margin-inline-end:7px;vertical-align:-1px}
+.sw1{background:var(--ch1)}.sw2{background:var(--ch2)}
+.chart{display:flex;align-items:stretch}
+.day{flex:1;min-width:0;position:relative}
+.day .bars{height:132px;display:flex;align-items:flex-end;justify-content:center;gap:2px;padding:0 3px;border-bottom:1px solid var(--bd2);border-radius:2px 2px 0 0;transition:background .12s}
+.day:hover .bars,.day:focus .bars{background:color-mix(in srgb,var(--tx) 5%,transparent)}
+.day:focus{outline:none}
+.bars i{flex:1;max-width:11px;min-width:3px;border-radius:4px 4px 0 0;background:var(--ch1)}
+.bars i.q{background:var(--ch2)}
+.day .dl{display:block;font-size:10px;color:var(--mu);text-align:center;padding-top:6px}
+.tip{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);margin-bottom:7px;background:var(--card);border:1px solid var(--bd2);border-radius:10px;padding:8px 12px;font-size:11.5px;line-height:1.8;white-space:nowrap;box-shadow:var(--shadow);opacity:0;pointer-events:none;transition:opacity .12s;z-index:5}
+.tip b{font-weight:700}
+.day:hover .tip,.day:focus .tip{opacity:1}
+.day:first-child .tip{left:auto;right:auto;transform:none;inset-inline-start:0}
+.day:last-child .tip{left:auto;right:auto;transform:none;inset-inline-end:0}
+.qrow{display:flex;align-items:flex-start;gap:12px;padding:13px 0;border-top:1px solid var(--bd)}
+.qrow:first-child{border-top:none;padding-top:4px}
+.qrow:last-child{padding-bottom:4px}
+.qrow .pill{margin:2px 0 0;flex:0 0 auto}
+.qrow .body{min-width:0;flex:1}
+.qrow .qt{font-weight:600;font-size:13.2px;line-height:1.55;overflow-wrap:anywhere}
+.qrow .meta{display:flex;gap:12px;color:var(--mu);font-size:11.5px;margin-top:4px}
+.pill.ai{color:color-mix(in srgb,var(--ac) 55%,var(--tx));border-color:color-mix(in srgb,var(--ac) 45%,transparent);background:color-mix(in srgb,var(--ac) 9%,transparent)}
+.pill.hu{color:color-mix(in srgb,var(--ok) 60%,var(--tx));border-color:color-mix(in srgb,var(--ok) 45%,transparent);background:color-mix(in srgb,var(--ok) 9%,transparent)}
+.pill.wt{color:color-mix(in srgb,var(--wn) 60%,var(--tx));border-color:color-mix(in srgb,var(--wn) 45%,transparent);background:color-mix(in srgb,var(--wn) 10%,transparent)}
+@media (max-width:600px){
+ .statrow{grid-template-columns:1fr 1fr;padding:2px 0}
+ .mini:nth-child(2n+1){border-inline-start:none}
+ .mini{padding:10px 16px}
+ .day:nth-child(2n) .dl{visibility:hidden}
+}
 
 /* List items */
 .item{border:1px solid var(--bd);border-radius:13px;padding:15px;margin:0 0 11px;background:var(--card)}
@@ -217,8 +258,26 @@ export const DASHBOARD_HTML = HEAD("Nova Bot Admin") + `<body>${THEME_BOOT}
    </div>
   </div>
 
-  <!-- STATS -->
-  <div class="pane on" data-pane="stats"><div class="grid" id="stats"></div></div>
+  <!-- OVERVIEW -->
+  <div class="pane on" data-pane="stats">
+   <div class="ovbar">
+    <span class="muted" id="ovupd"></span>
+    <button class="btn ghost sm" id="ovrefresh" onclick="loadStats()"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg><span data-k="ov_refresh">Refresh</span></button>
+   </div>
+   <div class="grid" id="stats"></div>
+   <div class="statrow" id="ministats"></div>
+   <div class="card">
+    <h2 data-k="ov_chart">Activity, last 14 days</h2>
+    <div class="desc" data-k="ov_chart_d">New users and support questions per day.</div>
+    <div class="legend"><span><i class="sw sw1"></i><span data-k="ov_users_s">New users</span></span><span><i class="sw sw2"></i><span data-k="ov_q_s">Questions</span></span></div>
+    <div class="chart" id="chart"></div>
+   </div>
+   <div class="card">
+    <h2 data-k="ov_recent">Recent support questions</h2>
+    <div class="desc" data-k="ov_recent_d">The latest messages users sent to support, newest first.</div>
+    <div id="qfeed"></div>
+   </div>
+  </div>
 
   <!-- FAQ -->
   <div class="pane" data-pane="faq">
@@ -339,12 +398,21 @@ export const DASHBOARD_HTML = HEAD("Nova Bot Admin") + `<body>${THEME_BOOT}
 </div>
 <div class="toast" id="toast"></div>
 <script>
-var I={en:{manage:'Manage',help:'Help',guide:'Guide',stats:'Stats',faq:'FAQ',sections:'Sections',users:'Users',settings:'Settings',broadcast:'Broadcast',theme:'Theme',
- ptitle_stats:'Stats',psub_stats:'How the bot is doing',ptitle_faq:'FAQ',psub_faq:'Questions users can browse',
+var I={en:{manage:'Manage',help:'Help',guide:'Guide',stats:'Overview',faq:'FAQ',sections:'Sections',users:'Users',settings:'Settings',broadcast:'Broadcast',theme:'Theme',
+ ptitle_stats:'Overview',psub_stats:'How Nova Bot is doing, at a glance',ptitle_faq:'FAQ',psub_faq:'Questions users can browse',
  ptitle_sections:'Menu sections',psub_sections:'Custom buttons on the bot menu',ptitle_settings:'Settings',psub_settings:'Welcome text and contact',
  ptitle_broadcast:'Broadcast',psub_broadcast:'Message every user',ptitle_guide:'Guide',psub_guide:'How each part works',
  ptitle_users:'Users',psub_users:'Block or unblock people',brandsub:'Admin panel',
  st_users:'Users',st_active:'Active (7d)',st_installs:'Panels built',st_builders:'Builders',st_banned:'Blocked',st_qa:'Questions',st_ai:'AI answered',
+ st_human:'Team answered',st_wait:'Waiting',
+ ov_refresh:'Refresh',ov_updated:'Updated {t}',
+ ov_sub_users:'+{n} this week',ov_sub_active:'{n}% of all users',ov_sub_installs:'by {n} builders',ov_sub_ai:'{n}% answered by AI',
+ ov_chart:'Activity, last 14 days',ov_chart_d:'New users and support questions per day. Hover a day for exact numbers.',
+ ov_users_s:'New users',ov_q_s:'Questions',ov_empty:'No activity in the last 14 days yet.',
+ ov_recent:'Recent support questions',ov_recent_d:'The latest messages users sent to support, newest first.',
+ ov_none:'No support questions yet. When users write to support, they show up here.',
+ s_ai:'AI',s_human:'Team',s_wait:'Waiting',
+ rt_just:'just now',rt_m:'{n}m ago',rt_h:'{n}h ago',rt_d:'{n}d ago',
  faq_ai:'Draft from real questions',faq_ai_d:"The AI reads recent support questions and your team's answers, then drafts new FAQ entries. Drafts appear below as hidden; review, edit and Show the good ones.",faq_ai_btn:'✨ Suggest FAQ entries',faq_ai_done:'Drafts added:',faq_ai_nokey:'AI is not available on this Worker',
  ai:'AI assistant',ai_d:"Answers support messages automatically when it is confident, using your FAQ and your team's past answers. Everything else still goes to your admin group, and every AI answer is copied there for review.",ai_enable:'Auto-answer support questions',ai_model_l:'Claude model (used when the API key is set)',ai_key_d:'Works for free out of the box on Cloudflare Workers AI (10,000 neurons/day included). For the best Persian quality, add the <code>ANTHROPIC_API_KEY</code> secret (<code>wrangler secret put ANTHROPIC_API_KEY</code>) and the bot switches to Claude automatically.',
  u_block_id:'Block by user ID',u_block_id_d:"Paste a Telegram user ID (you'll see it on messages in your contact group) to block them from the bot.",u_block:'Block',u_unblock:'Unblock',u_blocked:'blocked',u_none:'No users yet.',u_installs:'installs',
@@ -358,12 +426,21 @@ var I={en:{manage:'Manage',help:'Help',guide:'Guide',stats:'Stats',faq:'FAQ',sec
  bc:'Broadcast',bc_d:'Send a message to everyone who has used the bot. HTML allowed. Sends in the background.',bc_send:'Send to all users',
  edit:'Edit',hide:'Hide',show:'Show',del:'Delete',hidden:'hidden',none_faq:'No questions yet.',none_sec:'No sections yet.',
  saved:'Saved',added:'Added',deleted:'Deleted',sending:'Sending to',fill:'Please fill the fields',confirm_del:'Delete this?',confirm_bc:'Send to all users?'},
-fa:{manage:'مدیریت',help:'راهنما',guide:'راهنما',stats:'آمار',faq:'سؤالات',sections:'بخش‌ها',users:'کاربران',settings:'تنظیمات',broadcast:'همگانی',theme:'پوسته',
- ptitle_stats:'آمار',psub_stats:'وضعیت ربات',ptitle_faq:'سؤالات متداول',psub_faq:'سؤال‌هایی که کاربران می‌بینند',
+fa:{manage:'مدیریت',help:'راهنما',guide:'راهنما',stats:'نمای کلی',faq:'سؤالات',sections:'بخش‌ها',users:'کاربران',settings:'تنظیمات',broadcast:'همگانی',theme:'پوسته',
+ ptitle_stats:'نمای کلی',psub_stats:'وضعیت ربات در یک نگاه',ptitle_faq:'سؤالات متداول',psub_faq:'سؤال‌هایی که کاربران می‌بینند',
  ptitle_sections:'بخش‌های منو',psub_sections:'دکمه‌های سفارشی منوی ربات',ptitle_settings:'تنظیمات',psub_settings:'متن خوش‌آمد و تماس',
  ptitle_broadcast:'پیام همگانی',psub_broadcast:'ارسال به همهٔ کاربران',ptitle_guide:'راهنما',psub_guide:'هر بخش چطور کار می‌کند',
  ptitle_users:'کاربران',psub_users:'مسدود یا آزاد کردن افراد',brandsub:'پنل مدیریت',
  st_users:'کاربران',st_active:'فعال (۷ روز)',st_installs:'پنل ساخته‌شده',st_builders:'سازندگان',st_banned:'مسدود',st_qa:'سؤال‌ها',st_ai:'پاسخ هوش مصنوعی',
+ st_human:'پاسخ ادمین',st_wait:'در انتظار پاسخ',
+ ov_refresh:'به‌روزرسانی',ov_updated:'به‌روز شده در {t}',
+ ov_sub_users:'{n} کاربر جدید در این هفته',ov_sub_active:'{n}٪ از کل کاربران',ov_sub_installs:'توسط {n} سازنده',ov_sub_ai:'{n}٪ را هوش مصنوعی پاسخ داده',
+ ov_chart:'فعالیت ۱۴ روز اخیر',ov_chart_d:'کاربران جدید و سؤال‌های پشتیبانی در هر روز. برای عدد دقیق، نشانگر را روی هر روز نگه دار.',
+ ov_users_s:'کاربران جدید',ov_q_s:'سؤال‌ها',ov_empty:'در ۱۴ روز گذشته هنوز فعالیتی ثبت نشده.',
+ ov_recent:'سؤال‌های اخیر پشتیبانی',ov_recent_d:'آخرین پیام‌هایی که کاربران برای پشتیبانی فرستاده‌اند، جدیدترین اول.',
+ ov_none:'هنوز سؤالی به پشتیبانی نرسیده. هر وقت کاربری پیام بدهد، همین‌جا دیده می‌شود.',
+ s_ai:'هوش مصنوعی',s_human:'ادمین',s_wait:'در انتظار',
+ rt_just:'همین حالا',rt_m:'{n} دقیقه پیش',rt_h:'{n} ساعت پیش',rt_d:'{n} روز پیش',
  faq_ai:'پیش‌نویس از سؤال‌های واقعی',faq_ai_d:'هوش مصنوعی سؤال‌های اخیر کاربران و پاسخ‌های تیمت را می‌خواند و سؤال‌های متداول جدید پیش‌نویس می‌کند. پیش‌نویس‌ها پایین به‌صورت پنهان ظاهر می‌شوند؛ بازبینی و ویرایش کن و خوب‌ها را نمایش بده.',faq_ai_btn:'✨ پیشنهاد سؤالات متداول',faq_ai_done:'پیش‌نویس اضافه شد:',faq_ai_nokey:'هوش مصنوعی روی این ورکر در دسترس نیست',
  ai:'دستیار هوش مصنوعی',ai_d:'وقتی مطمئن باشد، با استفاده از سؤالات متداول و پاسخ‌های قبلی تیمت، به پیام‌های پشتیبانی خودکار جواب می‌دهد. بقیه مثل قبل به گروه ادمین می‌رود و هر پاسخ هوش مصنوعی هم برای بازبینی همان‌جا کپی می‌شود.',ai_enable:'پاسخ خودکار به سؤال‌های پشتیبانی',ai_model_l:'مدل Claude (وقتی کلید API تنظیم شده باشد)',ai_key_d:'به‌صورت پیش‌فرض رایگان روی Cloudflare Workers AI کار می‌کند (روزی ۱۰٬۰۰۰ نورون رایگان). برای بهترین کیفیت فارسی، سکرت <code>ANTHROPIC_API_KEY</code> را اضافه کن (<code>wrangler secret put ANTHROPIC_API_KEY</code>) تا ربات خودکار به Claude سوییچ کند.',
  u_block_id:'مسدود کردن با آیدی',u_block_id_d:'آیدی عددی کاربر تلگرام را بچسبان (روی پیام‌های گروه تماس دیده می‌شود) تا از ربات مسدود شود.',u_block:'مسدود',u_unblock:'آزاد کردن',u_blocked:'مسدود',u_none:'هنوز کاربری نیست.',u_installs:'نصب',
@@ -381,11 +458,12 @@ var GUIDE={en:[
  {h:'👋 Overview',intro:'This panel runs your Nova Telegram bot. Users message the bot to build their own free Nova proxy panel, read your FAQ, and reach your team. Everything below is managed from here and updates the bot instantly.',s:[
   'The bot works in <b>English and Persian</b>. Each user sees their own language automatically, and can switch it with the 🌐 button in the bot.',
   'Use the language and theme switches at the bottom of this sidebar. Your choice is remembered on this device.']},
- {h:'📊 Stats',s:[
-  '<b>Users</b>: everyone who has ever opened the bot.',
-  '<b>Active (7d)</b>: users who used it in the last 7 days.',
-  '<b>Panels built</b>: how many Nova panels were installed through the bot.',
-  '<b>Builders</b>: how many different users built at least one panel.']},
+ {h:'📊 Overview',s:[
+  '<b>Users</b>: everyone who has ever opened the bot. <b>Active (7d)</b>: users who used it in the last 7 days.',
+  '<b>Panels built</b>: how many Nova panels were installed through the bot, and by how many different builders.',
+  '<b>Questions</b> counts every support message, with the share the AI answered on its own. The small row below splits them into AI answered, team answered and still waiting.',
+  'The <b>14-day chart</b> shows new users and support questions per day; hover a day for the exact numbers.',
+  '<b>Recent support questions</b> lists the latest messages with their status: 🤖 answered by the AI, 👤 answered by your team, ⏳ still waiting in your admin group.']},
  {h:'❓ FAQ',s:[
   'Add a <b>Question</b> and its <b>Answer</b>, then tap <b>Add question</b>. It appears in the bot under the FAQ button.',
   'Answers accept simple HTML: <code>&lt;b&gt;bold&lt;/b&gt;</code>, <code>&lt;i&gt;italic&lt;/i&gt;</code>, <code>&lt;a href="…"&gt;link&lt;/a&gt;</code>, <code>&lt;code&gt;</code>.',
@@ -427,11 +505,12 @@ fa:[
  {h:'👋 معرفی',intro:'این پنل، ربات تلگرام نوای شما را اداره می‌کند. کاربران به ربات پیام می‌دهند تا پنل پراکسی نوای رایگان خودشان را بسازند، سؤالات متداول را بخوانند و به تیم شما برسند. همه‌چیزِ زیر از همین‌جا مدیریت می‌شود و ربات فوراً به‌روز می‌شود.',s:[
   'ربات به دو زبان <b>انگلیسی و فارسی</b> کار می‌کند. هر کاربر به‌طور خودکار زبان خودش را می‌بیند و با دکمهٔ 🌐 در ربات می‌تواند عوضش کند.',
   'از کلیدهای زبان و پوستهٔ پایین همین نوار کناری استفاده کن. انتخاب تو روی این دستگاه ذخیره می‌شود.']},
- {h:'📊 آمار',s:[
-  '<b>کاربران</b>: همهٔ کسانی که تا حالا ربات را باز کرده‌اند.',
-  '<b>فعال (۷ روز)</b>: کاربرانی که در ۷ روز گذشته استفاده کرده‌اند.',
-  '<b>پنل ساخته‌شده</b>: چند پنل نوا از طریق ربات نصب شده است.',
-  '<b>سازندگان</b>: چند کاربر متفاوت دست‌کم یک پنل ساخته‌اند.']},
+ {h:'📊 نمای کلی',s:[
+  '<b>کاربران</b>: همهٔ کسانی که تا حالا ربات را باز کرده‌اند. <b>فعال (۷ روز)</b>: کاربرانی که در ۷ روز گذشته استفاده کرده‌اند.',
+  '<b>پنل ساخته‌شده</b>: چند پنل نوا از طریق ربات نصب شده و توسط چند سازندهٔ متفاوت.',
+  '<b>سؤال‌ها</b> همهٔ پیام‌های پشتیبانی را می‌شمارد، همراه با سهمی که هوش مصنوعی خودش پاسخ داده. ردیف کوچک زیر آن، پاسخ هوش مصنوعی، پاسخ ادمین و در انتظار را جدا نشان می‌دهد.',
+  '<b>نمودار ۱۴ روزه</b> کاربران جدید و سؤال‌های پشتیبانی هر روز را نشان می‌دهد؛ برای عدد دقیق، نشانگر را روی هر روز نگه دار.',
+  '<b>سؤال‌های اخیر پشتیبانی</b> آخرین پیام‌ها را با وضعیتشان نشان می‌دهد: 🤖 پاسخ هوش مصنوعی، 👤 پاسخ تیم شما، ⏳ هنوز در گروه ادمین منتظر است.']},
  {h:'❓ سؤالات متداول',s:[
   'یک <b>سؤال</b> و <b>پاسخ</b> آن را وارد کن و <b>افزودن سؤال</b> را بزن. زیر دکمهٔ سؤالات در ربات ظاهر می‌شود.',
   'پاسخ‌ها از HTML ساده پشتیبانی می‌کنند: <code>&lt;b&gt;پررنگ&lt;/b&gt;</code>، <code>&lt;i&gt;مورب&lt;/i&gt;</code>، <code>&lt;a href="…"&gt;لینک&lt;/a&gt;</code>، <code>&lt;code&gt;</code>.',
@@ -499,9 +578,56 @@ function nav(btn){cur=btn.dataset.p;document.querySelectorAll('.nav-item').forEa
 $('lg').onclick=function(e){var b=e.target.closest('button');if(b){lang=b.dataset.l;localStorage.setItem('nova-lang',lang);applyLang()}};
 $('theme').onclick=function(){theme=theme==='dark'?'light':'dark';localStorage.setItem('nova-theme',theme);applyTheme()};
 
-async function loadStats(){var s=await api('GET','stats');$('stats').innerHTML=
- [['st_users',s.users],['st_active',s.active7d],['st_installs',s.installs],['st_builders',s.builders],['st_banned',s.banned||0],['st_qa',s.questions||0],['st_ai',s.aiAnswered||0]]
- .map(([k,n])=>'<div class="stat"><div class="n">'+n+'</div><div class="l">'+T(k)+'</div></div>').join('')}
+function nf(n){return Number(n||0).toLocaleString(lang==='fa'?'fa-IR':'en-US')}
+function fmt(k,n){return T(k).replace('{n}',nf(n))}
+function rel(ts){if(!ts)return'';var t=Date.parse(ts.indexOf('T')<0?ts.replace(' ','T')+'Z':ts);if(isNaN(t))return'';
+ var s=Math.max(0,(Date.now()-t)/1000);
+ if(s<60)return T('rt_just');if(s<3600)return fmt('rt_m',Math.floor(s/60));
+ if(s<86400)return fmt('rt_h',Math.floor(s/3600));return fmt('rt_d',Math.floor(s/86400))}
+
+async function loadStats(){
+ var b=$('ovrefresh');if(b)b.disabled=true;
+ var s=await api('GET','overview').catch(function(){return null});
+ if(b)b.disabled=false;
+ if(!s||s.error)return;
+ var loc=lang==='fa'?'fa-IR':'en-US';
+ var rate=s.questions?Math.round((s.aiAnswered||0)/s.questions*100):0;
+ var new7=(s.days||[]).slice(-7).reduce(function(a,d){return a+d.users},0);
+ var actPct=s.users?Math.round(s.active7d/s.users*100):0;
+ $('ovupd').textContent=T('ov_updated').replace('{t}',new Date().toLocaleTimeString(loc,{hour:'2-digit',minute:'2-digit'}));
+
+ var tile=function(n,k,sub){return '<div class="stat"><div class="n">'+nf(n)+'</div><div class="l">'+T(k)+'</div>'+(sub?'<div class="sub">'+sub+'</div>':'')+'</div>'};
+ $('stats').innerHTML=
+  tile(s.users,'st_users','<b>'+fmt('ov_sub_users',new7)+'</b>')+
+  tile(s.active7d,'st_active',fmt('ov_sub_active',actPct))+
+  tile(s.installs,'st_installs',fmt('ov_sub_installs',s.builders||0))+
+  tile(s.questions||0,'st_qa',fmt('ov_sub_ai',rate));
+ var mini=function(k,v){return '<div class="mini"><div class="v">'+nf(v)+'</div><div class="k">'+T(k)+'</div></div>'};
+ $('ministats').innerHTML=mini('st_ai',s.aiAnswered)+mini('st_human',s.humanAnswered)+mini('st_wait',s.waiting)+mini('st_banned',s.banned);
+
+ var days=s.days||[],max=1;
+ days.forEach(function(d){max=Math.max(max,d.users,d.questions)});
+ var any=days.some(function(d){return d.users||d.questions});
+ $('chart').innerHTML=!any?'<p class="muted">'+T('ov_empty')+'</p>':days.map(function(d){
+  var dt=new Date(d.d+'T00:00:00Z');
+  var dl=dt.toLocaleDateString(loc,{day:'numeric',timeZone:'UTC'});
+  var full=dt.toLocaleDateString(loc,{weekday:'short',month:'short',day:'numeric',timeZone:'UTC'});
+  var h1=d.users?Math.max(4,Math.round(d.users/max*100)):0;
+  var h2=d.questions?Math.max(4,Math.round(d.questions/max*100)):0;
+  var lbl=full+', '+T('ov_users_s')+': '+nf(d.users)+', '+T('ov_q_s')+': '+nf(d.questions);
+  return '<div class="day" tabindex="0" role="img" aria-label="'+esc(lbl)+'"><div class="tip" aria-hidden="true"><b>'+full+'</b><br>'+T('ov_users_s')+': '+nf(d.users)+'<br>'+T('ov_q_s')+': '+nf(d.questions)+'</div>'+
+   '<div class="bars"><i style="height:'+h1+'%"></i><i class="q" style="height:'+h2+'%"></i></div>'+
+   '<span class="dl">'+dl+'</span></div>'}).join('');
+
+ var ST={ai:{c:'ai',i:'🤖',k:'s_ai'},human:{c:'hu',i:'👤',k:'s_human'},waiting:{c:'wt',i:'⏳',k:'s_wait'}};
+ var rec=s.recent||[];
+ $('qfeed').innerHTML=!rec.length?'<p class="muted">'+T('ov_none')+'</p>':rec.map(function(r){
+  var st=ST[r.status]||ST.waiting;
+  var q=String(r.question||'');if(q.length>140)q=q.slice(0,140)+'…';
+  return '<div class="qrow"><span class="pill '+st.c+'">'+st.i+' '+T(st.k)+'</span>'+
+   '<div class="body"><div class="qt" dir="auto">'+esc(q)+'</div>'+
+   '<div class="meta"><span>'+esc(String(r.lang||'').toUpperCase())+'</span><span>'+rel(r.created_at)+'</span></div></div></div>'}).join('');
+}
 
 async function loadUsers(){var q=encodeURIComponent(($('usearch').value||'').trim());var list=await api('GET','users'+(q?('?q='+q):''));
  window._usr=list;var el=$('userlist');el.innerHTML=list.length?'':'<p class="muted">'+T('u_none')+'</p>';
