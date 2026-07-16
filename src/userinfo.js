@@ -1,7 +1,7 @@
 // Builds an admin-facing "who is this" card for a Telegram user, using only
 // what the Bot API exposes: profile (name / username / bio / premium /
 // language), a rough account-age estimate from the numeric id, and the user's
-// own history with this bot. No phone, IP, or identity — Telegram doesn't give
+// own history with this bot. No phone, IP, or identity, Telegram doesn't give
 // bots those.
 
 import { tg, esc } from "./telegram.js";
@@ -34,7 +34,7 @@ function approxAccountEra(id) {
   return `≈ ${y}${tag}`;
 }
 
-// Default card is compact (name, username, numeric ID) — that's all the admins
+// Default card is compact (name, username, numeric ID), that's all the admins
 // need on every forwarded message. Pass { full: true } (used by /whois) for the
 // complete picture: bio, premium, language, account-age estimate, bot history.
 export async function gatherUserCard(env, userId, from, { full = false } = {}) {

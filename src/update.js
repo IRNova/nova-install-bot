@@ -1,6 +1,6 @@
 // "Update my panel": pushes the latest Nova worker.js onto a Worker the user
 // picks on their own Cloudflare account. Uses the scripts /content endpoint,
-// which swaps only the code — bindings, secrets, settings and data survive.
+// which swaps only the code, bindings, secrets, settings and data survive.
 //
 // The token has to live across a couple of button taps (list → pick → confirm),
 // so it sits in the config table for at most 10 minutes and is deleted the
@@ -71,7 +71,7 @@ export async function startUpdate(env, chatId, token, userId, lang) {
 }
 
 // The user confirmed: fetch the latest worker.js and replace the script's
-// content. Single-use — the stored token is deleted before the upload starts.
+// content. Single-use, the stored token is deleted before the upload starts.
 export async function runUpdate(env, chatId, msgId, userId, idx, lang) {
   const ctx = await loadUpdCtx(env, userId);
   const name = ctx && ctx.w[idx];

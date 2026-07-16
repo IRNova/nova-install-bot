@@ -5,7 +5,7 @@ import { tg, send, edit, sendPhoto, editCaption, answerCb, deleteMessage, esc } 
 import {
   touchUser, getConfig, setConfig, listFaq, getFaq, listSections, getSection,
   markBlocked, getUserLang, setUserLang, isBanned, setBanned,
-  logQuestion, setQaAnswer, setQaAnswerByCard, markQaResolved, getQa,
+  logQuestion, setQaAnswer, setQaAnswerByCard, setQaDraft, markQaResolved, getQa,
 } from "./db.js";
 import { aiEnabled, autoAnswer } from "./ai.js";
 import { install, TOKEN_DEEPLINK, extractToken } from "./install.js";
@@ -262,6 +262,33 @@ async function handleCallback(cb, env) {
     return;
   }
 
+  // Send the AI-drafted reply (the "Send AI draft" button on a group card).
+  // The draft was written by the AI but a human is approving it here, so it is
+  // recorded as source 'approved' and feeds the knowledge pack as gold data.
+  if (data.startsWith("dok:")) {
+    const group = await getConfig(env, "contact_group_id", "");
+    if (!group || String(chatId) !== String(group)) return answerCb(env, cb.id);
+    const qa = await getQa(env, Number(data.slice(4))).catch(() => null);
+    if (!qa || !qa.draft) return answerCb(env, cb.id, "No draft found", true);
+    if (qa.answer) return answerCb(env, cb.id, "Already answered / قبلا پاسخ داده شده");
+    const uLang = (await getUserLang(env, qa.user_id)) || qa.lang || "en";
+    let r = await send(env, qa.user_id, `${t(uLang, "reply_prefix")}\n\n${qa.draft}`);
+    if (!r || r.ok === false) r = await send(env, qa.user_id, `${t(uLang, "reply_prefix")}\n\n${esc(qa.draft)}`);
+    if (!r || r.ok === false) {
+      if (r && r.error_code === 403) await markBlocked(env, qa.user_id).catch(() => {});
+      return answerCb(env, cb.id, "Could not deliver / ارسال نشد", true);
+    }
+    await setQaAnswer(env, qa.id, qa.draft, "approved");
+    await env.DB.prepare("UPDATE contact_map SET replied = 1 WHERE group_msg_id = ?")
+      .bind(msgId).run().catch(() => {});
+    const banned = await isBanned(env, qa.user_id).catch(() => false);
+    await tg(env, "editMessageReplyMarkup", {
+      chat_id: chatId, message_id: msgId,
+      reply_markup: contactKb(qa.user_id, banned, true),
+    }).catch(() => {});
+    return answerCb(env, cb.id, "Draft sent ✅");
+  }
+
   // Ban / unban from the admin group (the Block button on a forwarded message).
   if (data.startsWith("ban:") || data.startsWith("unban:")) {
     const group = await getConfig(env, "contact_group_id", "");
@@ -468,25 +495,35 @@ async function startContact(env, chatId, userId, lang) {
 // Admin-group action buttons shown under every forwarded message / whois card.
 // Labels are bilingual (EN / FA) since the group has no single language. Once
 // an admin has answered, the Reply button turns green and reads "Replied".
-export function contactKb(userId, banned, replied) {
-  return { inline_keyboard: [[
+// draftQaId adds a one-tap "Send draft" button for the AI-drafted reply.
+export function contactKb(userId, banned, replied, draftQaId = null) {
+  const rows = [];
+  if (draftQaId && !replied) {
+    rows.push([{ text: "🤖 Send AI draft / ارسال پیش‌نویس", callback_data: `dok:${draftQaId}`, style: "success" }]);
+  }
+  rows.push([
     replied
       ? { text: "✅ Replied / پاسخ داده شد", callback_data: `reply:${userId}`, style: "success" }
       : { text: "✍️ Reply / پاسخ", callback_data: `reply:${userId}`, style: "primary" },
     banned
       ? { text: "✅ Unblock / رفع مسدودی", callback_data: `unban:${userId}` }
       : { text: "🚫 Block / مسدود", callback_data: `ban:${userId}`, style: "danger" },
-  ]] };
+  ]);
+  return { inline_keyboard: rows };
 }
 
-// Every support message is logged to qa_log. The AI assistant answers when it
-// is confident; anything else (AI off, no key, API error, low confidence) goes
-// to the admin group exactly as before.
+// Every support message is logged to qa_log. In 'auto' mode the AI answers the
+// user directly when confident. In 'draft' mode (human in the loop, the default
+// until the knowledge base matures) the AI only saves a draft; the question is
+// forwarded to the admins, who send or edit the draft from the group card or
+// the panel. Anything else (AI off, no provider, API error, low confidence)
+// goes to the admin group exactly as before.
 async function handleContactMessage(env, from, chatId, msg, lang) {
   const question = (msg.text || "").trim();
   const qaId = question ? await logQuestion(env, from.id, lang, question).catch(() => null) : null;
 
   if (question && (await aiEnabled(env))) {
+    const mode = await getConfig(env, "ai_mode", "draft");
     await tg(env, "sendChatAction", { chat_id: chatId, action: "typing" }).catch(() => {});
     // Hard time cap: the platform stops background work ~30s after the webhook
     // response, so a slow model run must lose the race and fall through to the
@@ -496,6 +533,12 @@ async function handleContactMessage(env, from, chatId, msg, lang) {
       new Promise((res) => setTimeout(() => res(null), 15000)),
     ]);
     if (!r) console.log("ai: no confident answer in time, forwarding to humans");
+    if (mode !== "auto") {
+      if (r && r.confident && r.answer) await setQaDraft(env, qaId, r.answer).catch(() => {});
+      return forwardContact(env, from, chatId, msg, lang, {
+        qaId, draft: r && r.confident ? r.answer : "",
+      });
+    }
     if (r && r.confident && r.answer) {
       await setQaAnswer(env, qaId, r.answer, "ai").catch(() => {});
       const kb = { inline_keyboard: [
@@ -539,7 +582,7 @@ async function sendAiAudit(env, from, question, answer, qaId) {
   }
 }
 
-async function forwardContact(env, from, chatId, msg, lang, { qaId = null, note = "" } = {}) {
+async function forwardContact(env, from, chatId, msg, lang, { qaId = null, note = "", draft = "" } = {}) {
   const group = await getConfig(env, "contact_group_id", "");
   if (!group) return send(env, chatId, t(lang, "contact_notset"));
 
@@ -549,8 +592,9 @@ async function forwardContact(env, from, chatId, msg, lang, { qaId = null, note 
     `✉️ <b>New message</b>\n\n` +
     `“${esc(msg.text || "")}”\n\n` +
     card.text +
+    (draft ? `\n\n🤖 <b>AI draft</b> / پیش‌نویس:\n<blockquote>${esc(draft)}</blockquote>` : "") +
     `\n\n<i>Tap Reply below, or reply to this message, to answer them.</i>`;
-  const kb = contactKb(from.id, false);
+  const kb = contactKb(from.id, false, false, draft ? qaId : null);
 
   // The message admins reply to (mapped back to the user).
   const sent = await send(env, group, header, { reply_markup: kb });

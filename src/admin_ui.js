@@ -205,6 +205,11 @@ textarea{min-height:96px;resize:vertical;line-height:1.6}
 .qrow:first-child{border-top:none}
 .qrow .chip{margin-top:1px}
 .qrow .body{min-width:0;flex:1}
+.qrow .btncol{display:flex;flex-direction:column;gap:6px;flex:0 0 auto;align-items:stretch}
+.draftbox{background:var(--card2);border:1px solid var(--bd);border-radius:10px;padding:9px 11px;margin-top:7px;font-size:12.6px;line-height:1.6;color:var(--tx2);overflow-wrap:anywhere}
+.draftbox .dlabel{display:block;font-size:10.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--mu);margin-bottom:4px}
+.radio{display:flex;gap:9px;align-items:flex-start;margin:8px 0 0;font-size:13px;color:var(--tx2);cursor:pointer;font-weight:500}
+.radio input{width:auto;margin-top:3px;accent-color:var(--ac)}
 .qrow .qt{font-weight:500;font-size:13px;line-height:1.6;overflow-wrap:anywhere;color:var(--tx)}
 .qrow .meta{display:flex;gap:12px;color:var(--mu);font-size:11px;margin-top:4px;font-weight:500}
 .qrow .btn{flex:0 0 auto}
@@ -521,6 +526,9 @@ export const DASHBOARD_HTML = HEAD("Nova Bot Admin") + `<body>${THEME_BOOT}
     <div class="card-h"><div class="hgroup"><h3 data-k="ai">AI assistant</h3><div class="sub" data-k="ai_d">Answers support messages automatically when it is confident, using your FAQ and your team's past answers. Everything else still goes to your admin group, and every AI answer is copied there for review.</div></div></div>
     <div class="card-pad">
      <label class="switch"><input type="checkbox" id="ai_enabled"> <span data-k="ai_enable">Auto-answer support questions</span></label>
+     <label data-k="ai_mode_l">Mode</label>
+     <label class="radio"><input type="radio" name="ai_mode" id="ai_mode_draft" value="draft"> <span data-k="ai_mode_draft">Draft for review: the AI drafts a reply, your team checks and sends it (recommended while the knowledge base is young)</span></label>
+     <label class="radio"><input type="radio" name="ai_mode" id="ai_mode_auto" value="auto"> <span data-k="ai_mode_auto">Fully automatic: confident answers go straight to the user</span></label>
      <label data-k="ai_model_l" for="ai_model">Claude model (used when the API key is set)</label>
      <input id="ai_model" dir="ltr" placeholder="claude-opus-4-8">
      <div class="desc" style="margin:8px 0 0" data-k="ai_key_d">Works for free out of the box on Cloudflare Workers AI (10,000 neurons/day included). For the best Persian quality, add the <code>ANTHROPIC_API_KEY</code> secret (<code>wrangler secret put ANTHROPIC_API_KEY</code>) and the bot switches to Claude automatically.</div>
@@ -572,6 +580,8 @@ var I={en:{manage:'Manage',help:'Help',guide:'Guide',stats:'Overview',faq:'FAQ',
  ov_chart:'Activity, last 14 days',ov_chart_d:'New users and support questions per day. Hover a day for exact numbers.',
  ov_users_s:'New users',ov_q_s:'Questions',ov_empty:'No activity in the last 14 days yet.',
  ov_recent:'Recent support questions',ov_recent_d:'The latest messages users sent to support, newest first. Reply here and the bot delivers it to the user.',
+ qa_draft:'AI draft',qa_send_draft:'Send draft',qa_edit_send:'Edit and send',qa_approve_c:'Send the AI draft to the user as written?',
+ ai_mode_l:'Mode',ai_mode_draft:'Draft for review: the AI drafts a reply, your team checks and sends it (recommended while the knowledge base is young)',ai_mode_auto:'Fully automatic: confident answers go straight to the user',
  qa_reply:'Reply',qa_reply_p:'Write your answer. It is sent to the user in Telegram and saved as a human answer (the AI learns from it).',qa_sent:'Answer sent to the user',qa_fail:'Could not deliver, the user may have blocked the bot',
  ov_none:'No support questions yet. When users write to support, they show up here.',
  s_ai:'AI',s_human:'Team',s_wait:'Waiting',
@@ -602,6 +612,8 @@ fa:{manage:'مدیریت',help:'راهنما',guide:'راهنما',stats:'نما
  ov_chart:'فعالیت ۱۴ روز اخیر',ov_chart_d:'کاربران جدید و سؤال‌های پشتیبانی در هر روز. برای عدد دقیق، نشانگر را روی هر روز نگه دار.',
  ov_users_s:'کاربران جدید',ov_q_s:'سؤال‌ها',ov_empty:'در ۱۴ روز گذشته هنوز فعالیتی ثبت نشده.',
  ov_recent:'سؤال‌های اخیر پشتیبانی',ov_recent_d:'آخرین پیام‌هایی که کاربران برای پشتیبانی فرستاده‌اند، جدیدترین اول. همین‌جا پاسخ بده تا ربات به کاربر برساند.',
+ qa_draft:'پیش‌نویس هوش مصنوعی',qa_send_draft:'ارسال پیش‌نویس',qa_edit_send:'ویرایش و ارسال',qa_approve_c:'پیش‌نویس هوش مصنوعی همین‌طور که هست برای کاربر ارسال شود؟',
+ ai_mode_l:'حالت',ai_mode_draft:'پیش‌نویس برای بازبینی: هوش مصنوعی جواب را پیش‌نویس می‌کند، تیم شما بررسی و ارسال می‌کند (تا وقتی داده کم است پیشنهاد می‌شود)',ai_mode_auto:'کاملا خودکار: جواب‌های مطمئن مستقیم برای کاربر می‌رود',
  qa_reply:'پاسخ',qa_reply_p:'پاسخت را بنویس. در تلگرام برای کاربر ارسال می‌شود و به‌عنوان پاسخ انسانی ذخیره می‌شود (هوش مصنوعی از آن یاد می‌گیرد).',qa_sent:'پاسخ برای کاربر ارسال شد',qa_fail:'ارسال نشد، شاید کاربر ربات را بلاک کرده',
  ov_none:'هنوز سؤالی به پشتیبانی نرسیده. هر وقت کاربری پیام بدهد، همین‌جا دیده می‌شود.',
  s_ai:'هوش مصنوعی',s_human:'ادمین',s_wait:'در انتظار',
@@ -799,19 +811,32 @@ async function loadStats(){
  $('qfeed').innerHTML=!rec.length?emptyBox('ov_none'):rec.map(function(r){
   var st=ST[r.status]||ST.waiting;
   var q=String(r.question||'');if(q.length>140)q=q.slice(0,140)+'…';
+  var hasDraft=r.status==='waiting'&&r.draft;
+  var draft=hasDraft?'<div class="draftbox" dir="auto"><span class="dlabel">'+T('qa_draft')+'</span>'+esc(r.draft)+'</div>':'';
+  var btns=hasDraft
+   ?'<div class="btncol"><button class="btn sm" onclick="qaApprove('+(+r.id)+')">'+T('qa_send_draft')+'</button>'+
+     '<button class="btn ghost sm" onclick="qaReply('+(+r.id)+')">'+T('qa_edit_send')+'</button></div>'
+   :'<div class="btncol"><button class="btn ghost sm" onclick="qaReply('+(+r.id)+')">'+IC.reply+T('qa_reply')+'</button></div>';
   return '<div class="qrow"><span class="chip '+st.c+'"><span class="dot"></span>'+T(st.k)+'</span>'+
-   '<div class="body"><div class="qt" dir="auto">'+esc(q)+'</div>'+
+   '<div class="body"><div class="qt" dir="auto">'+esc(q)+'</div>'+draft+
    '<div class="meta"><span>'+esc(String(r.lang||'').toUpperCase())+'</span><span>'+rel(r.created_at)+'</span></div></div>'+
-   '<button class="btn ghost sm" onclick="qaReply('+(+r.id)+')">'+IC.reply+T('qa_reply')+'</button></div>'}).join('');
+   btns+'</div>'}).join('');
 }
 
 // Answer a support question from the panel. The reply is delivered to the
 // user in Telegram and saved as the human answer, which the AI learns from.
 async function qaReply(id){
  var r=(window._rec||[]).find(function(x){return x.id===id});
- var txt=prompt(T('qa_reply_p')+(r?'\\n\\n'+r.question:''),'');
+ var txt=prompt(T('qa_reply_p')+(r?'\\n\\n'+r.question:''),(r&&r.draft)||'');
  if(txt===null)return;txt=txt.trim();if(!txt)return toast(T('fill'));
  var res=await api('POST','qa-reply',{id:id,text:txt}).catch(function(){return null});
+ if(res&&res.ok){toast(T('qa_sent'));loadStats()}
+ else toast(res&&res.error==='undeliverable'?T('qa_fail'):'Error')}
+
+// Send the stored AI draft exactly as written (recorded as an approved answer).
+async function qaApprove(id){
+ if(!confirm(T('qa_approve_c')))return;
+ var res=await api('POST','qa-approve',{id:id}).catch(function(){return null});
  if(res&&res.ok){toast(T('qa_sent'));loadStats()}
  else toast(res&&res.error==='undeliverable'?T('qa_fail'):'Error')}
 
@@ -873,13 +898,15 @@ async function loadConfig(){var c=await api('GET','config');welcome_en.value=c.w
  contact_group_id.value=c.contact_group_id||'';contact_enabled.checked=c.contact_enabled!=='0';faq_enabled.checked=c.faq_enabled!=='0';
  join_required.checked=c.join_required!=='0';join_channel.value=c.join_channel||'';
  support_text.value=c.support_text||'';support_links.value=c.support_links||'';
- ai_enabled.checked=c.ai_enabled!=='0';ai_model.value=c.ai_model||'claude-opus-4-8'}
+ ai_enabled.checked=c.ai_enabled!=='0';ai_model.value=c.ai_model||'claude-opus-4-8';
+ ((c.ai_mode||'draft')==='auto'?ai_mode_auto:ai_mode_draft).checked=true}
 async function saveConfig(){await api('POST','config',{welcome_en:welcome_en.value,welcome_fa:welcome_fa.value,
  welcome_image:welcome_image.value.trim(),
  contact_group_id:contact_group_id.value.trim(),contact_enabled:contact_enabled.checked?'1':'0',faq_enabled:faq_enabled.checked?'1':'0',
  join_required:join_required.checked?'1':'0',join_channel:join_channel.value.trim().replace(/^@/,'').replace(/^https?:\\/\\/t\\.me\\//i,''),
  support_text:support_text.value,support_links:support_links.value,
- ai_enabled:ai_enabled.checked?'1':'0',ai_model:ai_model.value.trim()||'claude-opus-4-8'});toast(T('saved'))}
+ ai_enabled:ai_enabled.checked?'1':'0',ai_mode:ai_mode_auto.checked?'auto':'draft',
+ ai_model:ai_model.value.trim()||'claude-opus-4-8'});toast(T('saved'))}
 
 async function broadcast(){var t=bc.value.trim();if(!t)return toast(T('fill'));if(!confirm(T('confirm_bc')))return;
  var r=await api('POST','broadcast',{text:t});if(r.ok){toast(T('sending')+' '+r.recipients);bc.value=''}else toast('Error')}
