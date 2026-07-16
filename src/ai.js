@@ -59,7 +59,14 @@ async function runJson(env, { system, user, schema, maxTokens = 1024, effort = "
   try {
     r = await env.AI.run(m, payload);
   } catch (e) {
-    console.log("workers-ai retry after:", e && e.message);
+    const msg = (e && e.message) || "";
+    // Error 4006 = the daily free neuron allocation is spent (resets 00:00 UTC).
+    // That is a wall, not a blip: retrying just fails again a second later.
+    if (msg.includes("4006") || msg.includes("daily free allocation")) {
+      console.log("workers-ai: daily free neurons exhausted, no AI until 00:00 UTC");
+      throw e;
+    }
+    console.log("workers-ai retry after:", msg);
     await new Promise((res) => setTimeout(res, 400));
     r = await env.AI.run(m, payload);
   }
