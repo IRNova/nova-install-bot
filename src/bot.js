@@ -468,7 +468,7 @@ async function startContact(env, chatId, userId, lang) {
 // Admin-group action buttons shown under every forwarded message / whois card.
 // Labels are bilingual (EN / FA) since the group has no single language. Once
 // an admin has answered, the Reply button turns green and reads "Replied".
-function contactKb(userId, banned, replied) {
+export function contactKb(userId, banned, replied) {
   return { inline_keyboard: [[
     replied
       ? { text: "✅ Replied / پاسخ داده شد", callback_data: `reply:${userId}`, style: "success" }
