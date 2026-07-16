@@ -193,7 +193,11 @@ export async function overview(env) {
       question: String(r.question || "").slice(0, 200),
       lang: r.lang || "en",
       status: !answered ? "waiting" : r.source === "ai" ? "ai" : "human",
-      draft: !answered && r.draft ? String(r.draft).slice(0, 500) : "",
+      // The draft ships whole: Send draft delivers it from the database, so a
+      // trimmed copy would mean approving text you cannot see (and Edit and
+      // send would silently drop the tail). The question above is only context,
+      // so a snippet is fine there.
+      draft: !answered && r.draft ? String(r.draft) : "",
       draft_sure: r.draft_sure === 1,
       created_at: r.created_at,
     };
