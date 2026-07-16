@@ -44,15 +44,25 @@ async function runJson(env, { system, user, schema, maxTokens = 1024, effort = "
     const text = response.content.find((b) => b.type === "text");
     return text && text.text ? JSON.parse(text.text) : null;
   }
-  // Free path: Workers AI with JSON-schema constrained output.
-  const r = await env.AI.run(await cfModel(env), {
+  // Free path: Workers AI with JSON-schema constrained output. The first call
+  // on a cold isolate intermittently fails (error 1031), so retry once.
+  const m = await cfModel(env);
+  const payload = {
     messages: [
       { role: "system", content: system },
       { role: "user", content: user },
     ],
     response_format: { type: "json_schema", json_schema: schema },
     max_tokens: maxTokens,
-  });
+  };
+  let r;
+  try {
+    r = await env.AI.run(m, payload);
+  } catch (e) {
+    console.log("workers-ai retry after:", e && e.message);
+    await new Promise((res) => setTimeout(res, 400));
+    r = await env.AI.run(m, payload);
+  }
   const out = r && r.response;
   if (out == null) return null;
   return typeof out === "string" ? JSON.parse(out) : out;
