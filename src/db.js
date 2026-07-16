@@ -143,6 +143,50 @@ export async function listAnsweredQa(env, { source = null, limit = 40 } = {}) {
   return results || [];
 }
 
+// Everything the Overview pane needs in one payload: the base counters, support
+// pipeline counts, a 14-day activity series, and the latest support questions.
+// qa_log may not exist until migration 005 runs; every qa query degrades to zero.
+export async function overview(env) {
+  const base = await stats(env);
+  const waiting = await env.DB.prepare(
+    "SELECT COUNT(*) n FROM qa_log WHERE answer IS NULL OR answer = ''").first().catch(() => ({ n: 0 }));
+  const human = await env.DB.prepare(
+    "SELECT COUNT(*) n FROM qa_log WHERE source = 'human'").first().catch(() => ({ n: 0 }));
+
+  // Per-day counts for the last 14 days (UTC). Two tiny GROUP BY scans; the
+  // date window keeps them cheap even as the tables grow.
+  const dayRows = async (sql) => {
+    const { results } = await env.DB.prepare(sql).all().catch(() => ({ results: [] }));
+    const map = {};
+    for (const r of results || []) map[r.d] = r.n;
+    return map;
+  };
+  const newUsers = await dayRows(
+    "SELECT date(first_seen) d, COUNT(*) n FROM users WHERE first_seen >= date('now','-13 day') GROUP BY d");
+  const newQuestions = await dayRows(
+    "SELECT date(created_at) d, COUNT(*) n FROM qa_log WHERE created_at >= date('now','-13 day') GROUP BY d");
+  const days = [];
+  for (let i = 13; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 864e5).toISOString().slice(0, 10);
+    days.push({ d, users: newUsers[d] || 0, questions: newQuestions[d] || 0 });
+  }
+
+  // Latest support questions, newest first. Questions are untrusted user text;
+  // ship a trimmed snippet only, the panel escapes it before rendering.
+  const { results: recentRows } = await env.DB.prepare(
+    "SELECT id, question, answer, lang, source, created_at FROM qa_log ORDER BY id DESC LIMIT 8"
+  ).all().catch(() => ({ results: [] }));
+  const recent = (recentRows || []).map((r) => ({
+    id: r.id,
+    question: String(r.question || "").slice(0, 200),
+    lang: r.lang || "en",
+    status: r.source === "ai" ? "ai" : (r.source === "human" || (r.answer && r.answer !== "")) ? "human" : "waiting",
+    created_at: r.created_at,
+  }));
+
+  return { ...base, waiting: waiting.n, humanAnswered: human.n, days, recent };
+}
+
 export async function stats(env) {
   const users = await env.DB.prepare("SELECT COUNT(*) n FROM users").first();
   const active = await env.DB.prepare(
