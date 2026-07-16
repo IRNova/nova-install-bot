@@ -208,6 +208,8 @@ textarea{min-height:96px;resize:vertical;line-height:1.6}
 .qrow .btncol{display:flex;flex-direction:column;gap:6px;flex:0 0 auto;align-items:stretch}
 .draftbox{background:var(--card2);border:1px solid var(--bd);border-radius:10px;padding:9px 11px;margin-top:7px;font-size:12.6px;line-height:1.6;color:var(--tx2);overflow-wrap:anywhere}
 .draftbox .dlabel{display:block;font-size:10.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--mu);margin-bottom:4px}
+.draftbox.unsure{border-color:color-mix(in srgb,var(--wn) 45%,transparent);background:color-mix(in srgb,var(--wn) 7%,var(--card2))}
+.draftbox.unsure .dlabel .warn{color:var(--wn);letter-spacing:.3px;text-transform:none}
 .radio{display:flex;gap:9px;align-items:flex-start;margin:8px 0 0;font-size:13px;color:var(--tx2);cursor:pointer;font-weight:500}
 .radio input{width:auto;margin-top:3px;accent-color:var(--ac)}
 .qrow .qt{font-weight:500;font-size:13px;line-height:1.6;overflow-wrap:anywhere;color:var(--tx)}
@@ -581,6 +583,7 @@ var I={en:{manage:'Manage',help:'Help',guide:'Guide',stats:'Overview',faq:'FAQ',
  ov_users_s:'New users',ov_q_s:'Questions',ov_empty:'No activity in the last 14 days yet.',
  ov_recent:'Recent support questions',ov_recent_d:'The latest messages users sent to support, newest first. Reply here and the bot delivers it to the user.',
  qa_draft:'AI draft',qa_send_draft:'Send draft',qa_edit_send:'Edit and send',qa_approve_c:'Send the AI draft to the user as written?',
+ qa_unsure:'the model was unsure, read it closely',qa_approve_cu:'The model was unsure about this one and may have made details up. Send it to the user anyway, as written?',
  ai_mode_l:'Mode',ai_mode_draft:'Draft for review: the AI drafts a reply, your team checks and sends it (recommended while the knowledge base is young)',ai_mode_auto:'Fully automatic: confident answers go straight to the user',
  qa_reply:'Reply',qa_reply_p:'Write your answer. It is sent to the user in Telegram and saved as a human answer (the AI learns from it).',qa_sent:'Answer sent to the user',qa_fail:'Could not deliver, the user may have blocked the bot',
  ov_none:'No support questions yet. When users write to support, they show up here.',
@@ -613,6 +616,7 @@ fa:{manage:'مدیریت',help:'راهنما',guide:'راهنما',stats:'نما
  ov_users_s:'کاربران جدید',ov_q_s:'سؤال‌ها',ov_empty:'در ۱۴ روز گذشته هنوز فعالیتی ثبت نشده.',
  ov_recent:'سؤال‌های اخیر پشتیبانی',ov_recent_d:'آخرین پیام‌هایی که کاربران برای پشتیبانی فرستاده‌اند، جدیدترین اول. همین‌جا پاسخ بده تا ربات به کاربر برساند.',
  qa_draft:'پیش‌نویس هوش مصنوعی',qa_send_draft:'ارسال پیش‌نویس',qa_edit_send:'ویرایش و ارسال',qa_approve_c:'پیش‌نویس هوش مصنوعی همین‌طور که هست برای کاربر ارسال شود؟',
+ qa_unsure:'مدل مطمئن نبود، با دقت بخوانید',qa_approve_cu:'مدل درباره این جواب مطمئن نبود و ممکن است چیزی از خودش ساخته باشد. با این حال همین‌طور برای کاربر ارسال شود؟',
  ai_mode_l:'حالت',ai_mode_draft:'پیش‌نویس برای بازبینی: هوش مصنوعی جواب را پیش‌نویس می‌کند، تیم شما بررسی و ارسال می‌کند (تا وقتی داده کم است پیشنهاد می‌شود)',ai_mode_auto:'کاملا خودکار: جواب‌های مطمئن مستقیم برای کاربر می‌رود',
  qa_reply:'پاسخ',qa_reply_p:'پاسخت را بنویس. در تلگرام برای کاربر ارسال می‌شود و به‌عنوان پاسخ انسانی ذخیره می‌شود (هوش مصنوعی از آن یاد می‌گیرد).',qa_sent:'پاسخ برای کاربر ارسال شد',qa_fail:'ارسال نشد، شاید کاربر ربات را بلاک کرده',
  ov_none:'هنوز سؤالی به پشتیبانی نرسیده. هر وقت کاربری پیام بدهد، همین‌جا دیده می‌شود.',
@@ -812,10 +816,15 @@ async function loadStats(){
   var st=ST[r.status]||ST.waiting;
   var q=String(r.question||'');if(q.length>140)q=q.slice(0,140)+'…';
   var hasDraft=r.status==='waiting'&&r.draft;
-  var draft=hasDraft?'<div class="draftbox" dir="auto"><span class="dlabel">'+T('qa_draft')+'</span>'+esc(r.draft)+'</div>':'';
+  // An unsure draft is still worth showing, but it leads with Edit and send:
+  // the model tends to invent details on questions the knowledge base misses.
+  var unsure=hasDraft&&!r.draft_sure;
+  var draft=hasDraft?'<div class="draftbox'+(unsure?' unsure':'')+'" dir="auto"><span class="dlabel">'+
+    T('qa_draft')+(unsure?' <span class="warn">'+T('qa_unsure')+'</span>':'')+'</span>'+esc(r.draft)+'</div>':'';
+  var send='<button class="btn'+(unsure?' ghost':'')+' sm" onclick="qaApprove('+(+r.id)+')">'+T('qa_send_draft')+'</button>';
+  var edit='<button class="btn'+(unsure?'':' ghost')+' sm" onclick="qaReply('+(+r.id)+')">'+T('qa_edit_send')+'</button>';
   var btns=hasDraft
-   ?'<div class="btncol"><button class="btn sm" onclick="qaApprove('+(+r.id)+')">'+T('qa_send_draft')+'</button>'+
-     '<button class="btn ghost sm" onclick="qaReply('+(+r.id)+')">'+T('qa_edit_send')+'</button></div>'
+   ?'<div class="btncol">'+(unsure?edit+send:send+edit)+'</div>'
    :'<div class="btncol"><button class="btn ghost sm" onclick="qaReply('+(+r.id)+')">'+IC.reply+T('qa_reply')+'</button></div>';
   return '<div class="qrow"><span class="chip '+st.c+'"><span class="dot"></span>'+T(st.k)+'</span>'+
    '<div class="body"><div class="qt" dir="auto">'+esc(q)+'</div>'+draft+
@@ -835,7 +844,8 @@ async function qaReply(id){
 
 // Send the stored AI draft exactly as written (recorded as an approved answer).
 async function qaApprove(id){
- if(!confirm(T('qa_approve_c')))return;
+ var r=(window._rec||[]).find(function(x){return x.id===id});
+ if(!confirm(T(r&&!r.draft_sure?'qa_approve_cu':'qa_approve_c')))return;
  var res=await api('POST','qa-approve',{id:id}).catch(function(){return null});
  if(res&&res.ok){toast(T('qa_sent'));loadStats()}
  else toast(res&&res.error==='undeliverable'?T('qa_fail'):'Error')}
