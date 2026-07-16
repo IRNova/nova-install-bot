@@ -525,20 +525,44 @@ async function handleContactMessage(env, from, chatId, msg, lang) {
   if (question && (await aiEnabled(env))) {
     const mode = await getConfig(env, "ai_mode", "draft");
     await tg(env, "sendChatAction", { chat_id: chatId, action: "typing" }).catch(() => {});
-    // Hard time cap: the platform stops background work ~30s after the webhook
-    // response, so a slow model run must lose the race and fall through to the
-    // human forward instead of silently killing the whole flow.
+    if (mode !== "auto") {
+      // Draft mode: nothing user-facing waits on the model, so forward to the
+      // humans FIRST (the platform kills slow background work ~30s after the
+      // webhook response), then attach the AI draft to the card once ready.
+      const fw = await forwardContact(env, from, chatId, msg, lang, { qaId });
+      const r = await Promise.race([
+        autoAnswer(env, question, lang).catch(() => null),
+        new Promise((res) => setTimeout(() => res(null), 20000)),
+      ]);
+      if (!(r && r.confident && r.answer)) {
+        console.log("ai: no confident draft in time for qa", qaId);
+        return;
+      }
+      await setQaDraft(env, qaId, r.answer).catch(() => {});
+      const group = await getConfig(env, "contact_group_id", "");
+      if (group && fw && fw.cardMsgId) {
+        const sent = await send(env, group,
+          `🤖 <b>AI draft</b> / پیش‌نویس:\n<blockquote>${esc(r.answer)}</blockquote>`, {
+            reply_to_message_id: fw.cardMsgId,
+            reply_markup: { inline_keyboard: [[
+              { text: "🤖 Send AI draft / ارسال پیش‌نویس", callback_data: `dok:${qaId}`, style: "success" },
+            ]] },
+          });
+        if (sent && sent.result && sent.result.message_id) {
+          await env.DB.prepare(
+            "INSERT OR REPLACE INTO contact_map (group_msg_id, user_id, card_msg_id, qa_id) VALUES (?, ?, ?, ?)"
+          ).bind(sent.result.message_id, from.id, fw.cardMsgId, qaId).run().catch(() => {});
+        }
+      }
+      return;
+    }
+    // Auto mode: the user is actively waiting, keep the cap tight and fall
+    // through to the human forward when the model is slow or unsure.
     const r = await Promise.race([
       autoAnswer(env, question, lang).catch(() => null),
       new Promise((res) => setTimeout(() => res(null), 15000)),
     ]);
     if (!r) console.log("ai: no confident answer in time, forwarding to humans");
-    if (mode !== "auto") {
-      if (r && r.confident && r.answer) await setQaDraft(env, qaId, r.answer).catch(() => {});
-      return forwardContact(env, from, chatId, msg, lang, {
-        qaId, draft: r && r.confident ? r.answer : "",
-      });
-    }
     if (r && r.confident && r.answer) {
       await setQaAnswer(env, qaId, r.answer, "ai").catch(() => {});
       const kb = { inline_keyboard: [
@@ -582,9 +606,9 @@ async function sendAiAudit(env, from, question, answer, qaId) {
   }
 }
 
-async function forwardContact(env, from, chatId, msg, lang, { qaId = null, note = "", draft = "" } = {}) {
+async function forwardContact(env, from, chatId, msg, lang, { qaId = null, note = "" } = {}) {
   const group = await getConfig(env, "contact_group_id", "");
-  if (!group) return send(env, chatId, t(lang, "contact_notset"));
+  if (!group) { await send(env, chatId, t(lang, "contact_notset")); return {}; }
 
   const card = await gatherUserCard(env, from.id, from);
   const header =
@@ -592,18 +616,19 @@ async function forwardContact(env, from, chatId, msg, lang, { qaId = null, note 
     `✉️ <b>New message</b>\n\n` +
     `“${esc(msg.text || "")}”\n\n` +
     card.text +
-    (draft ? `\n\n🤖 <b>AI draft</b> / پیش‌نویس:\n<blockquote>${esc(draft)}</blockquote>` : "") +
     `\n\n<i>Tap Reply below, or reply to this message, to answer them.</i>`;
-  const kb = contactKb(from.id, false, false, draft ? qaId : null);
+  const kb = contactKb(from.id, false);
 
   // The message admins reply to (mapped back to the user).
   const sent = await send(env, group, header, { reply_markup: kb });
-  if (sent && sent.result && sent.result.message_id) {
+  const cardMsgId = sent && sent.result && sent.result.message_id;
+  if (cardMsgId) {
     await env.DB.prepare(
       "INSERT OR REPLACE INTO contact_map (group_msg_id, user_id, card_msg_id, qa_id) VALUES (?, ?, ?, ?)"
-    ).bind(sent.result.message_id, from.id, sent.result.message_id, qaId).run();
+    ).bind(cardMsgId, from.id, cardMsgId, qaId).run();
   }
-  return send(env, chatId, t(lang, "contact_sent"), { reply_markup: { inline_keyboard: [backRow(lang)] } });
+  await send(env, chatId, t(lang, "contact_sent"), { reply_markup: { inline_keyboard: [backRow(lang)] } });
+  return { cardMsgId };
 }
 
 // /whois <id> in the admin group, or /whois as a reply to a forwarded message.
