@@ -107,21 +107,30 @@ async function handleApi(request, env, ctx, res, method) {
   }
 
   // Answer a support question straight from the panel: deliver via the bot in
-  // the user's language, record it as the human answer (the AI learns from
-  // it), and flip any Telegram group cards for this question to "Replied".
-  if (res === "qa-reply" && method === "POST") {
+  // the user's language, record it (the AI learns from it), and flip any
+  // Telegram group cards for this question to "Replied".
+  // qa-reply sends admin-typed text (source 'human'); qa-approve sends the
+  // stored AI draft as-is (source 'approved').
+  if ((res === "qa-reply" || res === "qa-approve") && method === "POST") {
     const id = Number(body.id);
-    const text = String(body.text || "").trim();
-    if (!id || !text) return json({ error: "empty" }, 400);
+    if (!id) return json({ error: "empty" }, 400);
     const qa = await getQa(env, id).catch(() => null);
     if (!qa || !qa.user_id) return json({ error: "not_found" }, 404);
+    const approving = res === "qa-approve";
+    const text = approving ? String(qa.draft || "") : String(body.text || "").trim();
+    if (!text) return json({ error: approving ? "no_draft" : "empty" }, 400);
+    if (approving && qa.answer) return json({ error: "already_answered" }, 409);
     const lang = (await getUserLang(env, qa.user_id)) || qa.lang || "en";
-    const r = await send(env, qa.user_id, `${t(lang, "reply_prefix")}\n\n${esc(text)}`);
+    // Drafts may carry allowed Telegram HTML; admin-typed text is escaped.
+    let r = await send(env, qa.user_id, `${t(lang, "reply_prefix")}\n\n${approving ? text : esc(text)}`);
+    if (approving && (!r || r.ok === false)) {
+      r = await send(env, qa.user_id, `${t(lang, "reply_prefix")}\n\n${esc(text)}`);
+    }
     if (!r || r.ok === false) {
       if (r && r.error_code === 403) await markBlocked(env, qa.user_id).catch(() => {});
       return json({ error: "undeliverable" }, 502);
     }
-    await setQaAnswer(env, id, text, "human");
+    await setQaAnswer(env, id, text, approving ? "approved" : "human");
     const group = await getConfig(env, "contact_group_id", "");
     const banned = await isBanned(env, qa.user_id).catch(() => false);
     const { results } = await env.DB.prepare(
@@ -156,7 +165,7 @@ async function handleApi(request, env, ctx, res, method) {
   const CONFIG_KEYS = ["welcome", "welcome_en", "welcome_fa", "welcome_image",
     "contact_group_id", "contact_enabled", "faq_enabled",
     "join_required", "join_channel", "support_text", "support_links",
-    "ai_enabled", "ai_model", "ai_cf_model"];
+    "ai_enabled", "ai_mode", "ai_model", "ai_cf_model"];
   if (res === "config" && method === "GET") {
     const out = {};
     for (const k of CONFIG_KEYS) out[k] = await getConfig(env, k, "");

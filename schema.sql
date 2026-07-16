@@ -58,7 +58,8 @@ CREATE TABLE IF NOT EXISTS qa_log (
   lang        TEXT DEFAULT 'en',
   question    TEXT NOT NULL,
   answer      TEXT,                        -- null until answered
-  source      TEXT,                        -- 'ai' | 'human'
+  source      TEXT,                        -- 'ai' | 'human' | 'approved' (AI draft a human sent)
+  draft       TEXT,                        -- AI-drafted reply awaiting review (draft mode)
   resolved    INTEGER DEFAULT 0,           -- 1 when the user tapped "Solved"
   created_at  TEXT DEFAULT (datetime('now')),
   answered_at TEXT
@@ -76,4 +77,5 @@ INSERT OR IGNORE INTO config (key, value) VALUES
   ('support_links', ''),
   ('welcome_image', 'https://nova-install-bot.bitter-flower-1b15.workers.dev/banner.jpg'),
   ('ai_enabled', '1'),
+  ('ai_mode', 'draft'),
   ('ai_model', 'claude-opus-4-8');

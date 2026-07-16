@@ -1,8 +1,8 @@
-// Nova Install Bot — entry point.
+// Nova Install Bot, entry point.
 //
 // Two surfaces on one Worker:
-//   • /webhook  — Telegram updates (install flow, menu, FAQ, contact)
-//   • /admin    — password-protected web panel to manage content + broadcast
+//   • /webhook , Telegram updates (install flow, menu, FAQ, contact)
+//   • /admin   , password-protected web panel to manage content + broadcast
 //
 // Secrets (wrangler secret put, never committed):
 //   BOT_TOKEN, WEBHOOK_SECRET, ADMIN_PASSWORD

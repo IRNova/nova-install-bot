@@ -13,9 +13,9 @@ export const TOKEN_DEEPLINK =
 // Cloudflare API tokens come in two shapes:
 //   • legacy: a 40-character [A-Za-z0-9_-] string
 //   • current (2026+): a scannable "cfut_" (user) / "cfat_" (account) prefix,
-//     then 40 chars, then a checksum — so the whole thing is a single run of
+//     then 40 chars, then a checksum, so the whole thing is a single run of
 //     [A-Za-z0-9_-] that is LONGER than 40 chars.
-// So we never cap at exactly 40 — we take the whole contiguous token run
+// So we never cap at exactly 40, we take the whole contiguous token run
 // (40 or more chars). Capping at 40 slices a modern token and Cloudflare then
 // rejects it as "Invalid API Token (code 1000)".
 export const TOKEN_RE = /^[A-Za-z0-9_-]{40,}$/;

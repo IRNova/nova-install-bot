@@ -123,6 +123,11 @@ export async function setQaAnswerByCard(env, cardMsgId, answer) {
   ).bind(answer, cardMsgId).run();
 }
 
+export async function setQaDraft(env, qaId, draft) {
+  if (!qaId) return;
+  await env.DB.prepare("UPDATE qa_log SET draft = ? WHERE id = ?").bind(draft, qaId).run();
+}
+
 export async function markQaResolved(env, qaId) {
   await env.DB.prepare("UPDATE qa_log SET resolved = 1 WHERE id = ?").bind(qaId).run();
 }
@@ -131,12 +136,16 @@ export async function getQa(env, qaId) {
   return env.DB.prepare("SELECT * FROM qa_log WHERE id = ?").bind(qaId).first();
 }
 
-// Recent answered exchanges, most recent first. Human answers are the gold
-// standard for the AI knowledge pack; pass source to filter.
-export async function listAnsweredQa(env, { source = null, limit = 40 } = {}) {
+// Recent answered exchanges, most recent first. Human answers and
+// human-approved AI drafts are the gold standard for the AI knowledge pack;
+// pass sources to filter.
+export async function listAnsweredQa(env, { sources = null, limit = 40 } = {}) {
   let q = "SELECT question, answer, lang, source FROM qa_log WHERE answer IS NOT NULL AND answer != ''";
   const binds = [];
-  if (source) { q += " AND source = ?"; binds.push(source); }
+  if (sources && sources.length) {
+    q += ` AND source IN (${sources.map(() => "?").join(",")})`;
+    binds.push(...sources);
+  }
   q += " ORDER BY id DESC LIMIT ?";
   binds.push(limit);
   const { results } = await env.DB.prepare(q).bind(...binds).all();
@@ -151,7 +160,7 @@ export async function overview(env) {
   const waiting = await env.DB.prepare(
     "SELECT COUNT(*) n FROM qa_log WHERE answer IS NULL OR answer = ''").first().catch(() => ({ n: 0 }));
   const human = await env.DB.prepare(
-    "SELECT COUNT(*) n FROM qa_log WHERE source = 'human'").first().catch(() => ({ n: 0 }));
+    "SELECT COUNT(*) n FROM qa_log WHERE source IN ('human','approved')").first().catch(() => ({ n: 0 }));
 
   // Per-day counts for the last 14 days (UTC). Two tiny GROUP BY scans; the
   // date window keeps them cheap even as the tables grow.
@@ -174,15 +183,19 @@ export async function overview(env) {
   // Latest support questions, newest first. Questions are untrusted user text;
   // ship a trimmed snippet only, the panel escapes it before rendering.
   const { results: recentRows } = await env.DB.prepare(
-    "SELECT id, question, answer, lang, source, created_at FROM qa_log ORDER BY id DESC LIMIT 8"
+    "SELECT id, question, answer, lang, source, draft, created_at FROM qa_log ORDER BY id DESC LIMIT 8"
   ).all().catch(() => ({ results: [] }));
-  const recent = (recentRows || []).map((r) => ({
-    id: r.id,
-    question: String(r.question || "").slice(0, 200),
-    lang: r.lang || "en",
-    status: r.source === "ai" ? "ai" : (r.source === "human" || (r.answer && r.answer !== "")) ? "human" : "waiting",
-    created_at: r.created_at,
-  }));
+  const recent = (recentRows || []).map((r) => {
+    const answered = !!(r.answer && r.answer !== "");
+    return {
+      id: r.id,
+      question: String(r.question || "").slice(0, 200),
+      lang: r.lang || "en",
+      status: !answered ? "waiting" : r.source === "ai" ? "ai" : "human",
+      draft: !answered && r.draft ? String(r.draft).slice(0, 500) : "",
+      created_at: r.created_at,
+    };
+  });
 
   return { ...base, waiting: waiting.n, humanAnswered: human.n, days, recent };
 }

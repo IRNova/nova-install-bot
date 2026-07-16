@@ -115,7 +115,7 @@ async function knowledgePack(env) {
   const faq = await listFaq(env).catch(() => []);
   // Keep the pack small: prompt size is the main driver of Workers AI latency,
   // and the whole flow must finish well inside the post-response time budget.
-  const humanQa = await listAnsweredQa(env, { source: "human", limit: 25 }).catch(() => []);
+  const humanQa = await listAnsweredQa(env, { sources: ["human", "approved"], limit: 25 }).catch(() => []);
   let kb = NOVA_REFERENCE;
   if (faq.length) {
     kb += "\n\nOfficial FAQ entries:\n" +
