@@ -9,7 +9,7 @@
 // falls back to human support.
 
 import Anthropic from "@anthropic-ai/sdk";
-import { getConfig, listFaq, listAnsweredQa } from "./db.js";
+import { getConfig, listFaq, listAnsweredQa, bumpAiUsage } from "./db.js";
 
 export async function aiEnabled(env) {
   if (!env.ANTHROPIC_API_KEY && !env.AI) return false;
@@ -60,16 +60,21 @@ async function runJson(env, { system, user, schema, maxTokens = 1024, effort = "
     r = await env.AI.run(m, payload);
   } catch (e) {
     const msg = (e && e.message) || "";
-    // Error 4006 = the daily free neuron allocation is spent (resets 00:00 UTC).
-    // That is a wall, not a blip: retrying just fails again a second later.
+    // Error 4006 = the daily free neuron allowance is spent. That is a wall,
+    // not a blip: retrying just fails again a second later. When it frees up is
+    // not documented and is not the 00:00 UTC analytics rollover (verified
+    // 2026-07-17: the counter reset, the wall did not).
     if (msg.includes("4006") || msg.includes("daily free allocation")) {
-      console.log("workers-ai: daily free neurons exhausted, no AI until 00:00 UTC");
+      console.log("workers-ai: daily free neurons exhausted, no AI until the allowance frees up");
+      await bumpAiUsage(env, { blocked: true }).catch(() => {});
       throw e;
     }
     console.log("workers-ai retry after:", msg);
     await new Promise((res) => setTimeout(res, 400));
     r = await env.AI.run(m, payload);
   }
+  // Count the spend before parsing: a malformed response still cost the same.
+  await bumpAiUsage(env, { tokens: (r && r.usage && r.usage.total_tokens) || 0 }).catch(() => {});
   const out = r && r.response;
   if (out == null) return null;
   return typeof out === "string" ? JSON.parse(out) : out;

@@ -66,6 +66,14 @@ CREATE TABLE IF NOT EXISTS qa_log (
   answered_at TEXT
 );
 
+-- What the AI spends per UTC day, so the panel can show it beside the switch.
+CREATE TABLE IF NOT EXISTS ai_usage (
+  day     TEXT PRIMARY KEY,   -- UTC date, YYYY-MM-DD
+  calls   INTEGER DEFAULT 0,  -- successful model calls
+  tokens  INTEGER DEFAULT 0,  -- total tokens (prompt + completion) when reported
+  blocked INTEGER DEFAULT 0   -- calls refused because the allowance was spent
+);
+
 -- Seed default config.
 INSERT OR IGNORE INTO config (key, value) VALUES
   ('welcome', ''),

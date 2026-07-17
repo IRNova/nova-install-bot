@@ -184,6 +184,26 @@ textarea{min-height:96px;resize:vertical;line-height:1.6}
 .swatch.s1{background:var(--ac)}
 .swatch.s2{background:var(--ac2)}
 
+/* AI control card (Overview). The count leads; colour only ramps once the
+   free allowance is nearly gone, so a normal day reads calm. */
+/* The header switch carries no text, so pad the label out to a 41px hit area. */
+.aicard .card-h .switch{margin-top:0;padding:9px 0;touch-action:manipulation}
+.ai-body{display:flex;flex-direction:column;gap:12px}
+.ai-body .note{margin:0}
+.ai-hero{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap}
+.ai-hero .n{font-size:30px;font-weight:700;letter-spacing:-.6px;line-height:1;font-variant-numeric:tabular-nums;color:var(--tx)}
+.ai-hero .of{font-size:12.5px;color:var(--mu);font-weight:500;line-height:1.5}
+.meter{height:6px;border-radius:999px;background:var(--card2);border:1px solid var(--bd);overflow:hidden}
+.meter i{display:block;height:100%;border-radius:999px;background:var(--ac)}
+.aicard.warn .ai-hero .n{color:var(--wn)}
+.aicard.warn .meter i{background:var(--wn)}
+.aicard.bad .ai-hero .n{color:var(--dg)}
+.aicard.bad .meter i{background:var(--dg)}
+.ai-off{font-size:12.5px;color:var(--mu);line-height:1.65}
+.ai-foot{display:flex;align-items:center;gap:10px;flex-wrap:wrap;min-height:32px;font-size:11.5px;color:var(--mu);font-weight:500;line-height:1.5}
+.ai-foot .btn{margin-inline-start:auto}
+.note.bad{background:color-mix(in srgb,var(--dg) 8%,transparent);border-color:color-mix(in srgb,var(--dg) 35%,transparent)}
+
 /* Activity chart */
 .chart{display:flex;align-items:stretch}
 .day{flex:1;min-width:0;position:relative}
@@ -422,6 +442,16 @@ export const DASHBOARD_HTML = HEAD("Nova Bot Admin") + `<body>${THEME_BOOT}
    </div>
    <div class="kpi-grid" id="stats"></div>
    <div class="statrow" id="ministats"></div>
+   <div class="card aicard hidden" id="aicard">
+    <div class="card-h">
+     <div class="hgroup"><h3 data-k="ai">AI assistant</h3><div class="sub" data-k="ai_ov_d">Drafts answers to support questions, on the free Cloudflare allowance.</div></div>
+     <div class="right">
+      <span class="chip hidden" id="aimode"></span>
+      <label class="switch"><input type="checkbox" id="aisw" onchange="aiToggle(this.checked)"></label>
+     </div>
+    </div>
+    <div class="card-pad ai-body" id="aibody"></div>
+   </div>
    <div class="card">
     <div class="card-h">
      <div class="hgroup"><h3 data-k="ov_chart">Activity, last 14 days</h3><div class="sub" data-k="ov_chart_d">New users and support questions per day.</div></div>
@@ -524,7 +554,7 @@ export const DASHBOARD_HTML = HEAD("Nova Bot Admin") + `<body>${THEME_BOOT}
      <div class="form-foot"><button class="btn" onclick="saveConfig()" data-k="save">Save</button></div>
     </div>
    </div>
-   <div class="card">
+   <div class="card" id="aiset">
     <div class="card-h"><div class="hgroup"><h3 data-k="ai">AI assistant</h3><div class="sub" data-k="ai_d">Answers support messages automatically when it is confident, using your FAQ and your team's past answers. Everything else still goes to your admin group, and every AI answer is copied there for review.</div></div></div>
     <div class="card-pad">
      <label class="switch"><input type="checkbox" id="ai_enabled"> <span data-k="ai_enable">Auto-answer support questions</span></label>
@@ -582,6 +612,13 @@ var I={en:{manage:'Manage',help:'Help',guide:'Guide',stats:'Overview',faq:'FAQ',
  ov_chart:'Activity, last 14 days',ov_chart_d:'New users and support questions per day. Hover a day for exact numbers.',
  ov_users_s:'New users',ov_q_s:'Questions',ov_empty:'No activity in the last 14 days yet.',
  ov_recent:'Recent support questions',ov_recent_d:'The latest messages users sent to support, newest first. Reply here and the bot delivers it to the user.',
+ ai_ov_d:'Drafts answers to support questions, on the free Cloudflare allowance.',ai_ov_sw:'Turn the AI assistant on or off',
+ ai_ov_draft:'Draft for review',ai_ov_auto:'Fully automatic',
+ ai_ov_of:'of about {n} free answers today',ai_ov_pct:'{n}% of the free daily allowance used',
+ ai_ov_out:'The free allowance ran out. {n} questions got no AI draft. They still reached your admin group, so nothing is lost.',
+ ai_ov_later:'The allowance frees up again later in the day.',
+ ai_ov_off_d:'The AI is off. Support questions go straight to your admin group, with no drafts.',ai_ov_off_used:'It drafted {n} answers earlier today.',
+ ai_ov_settings:'Settings',
  qa_draft:'AI draft',qa_send_draft:'Send draft',qa_edit_send:'Edit and send',qa_approve_c:'Send the AI draft to the user as written?',
  qa_unsure:'the model was unsure, read it closely',qa_approve_cu:'The model was unsure about this one and may have made details up. Send it to the user anyway, as written?',
  ai_mode_l:'Mode',ai_mode_draft:'Draft for review: the AI drafts a reply, your team checks and sends it (recommended while the knowledge base is young)',ai_mode_auto:'Fully automatic: confident answers go straight to the user',
@@ -615,6 +652,13 @@ fa:{manage:'مدیریت',help:'راهنما',guide:'راهنما',stats:'نما
  ov_chart:'فعالیت ۱۴ روز اخیر',ov_chart_d:'کاربران جدید و سؤال‌های پشتیبانی در هر روز. برای عدد دقیق، نشانگر را روی هر روز نگه دار.',
  ov_users_s:'کاربران جدید',ov_q_s:'سؤال‌ها',ov_empty:'در ۱۴ روز گذشته هنوز فعالیتی ثبت نشده.',
  ov_recent:'سؤال‌های اخیر پشتیبانی',ov_recent_d:'آخرین پیام‌هایی که کاربران برای پشتیبانی فرستاده‌اند، جدیدترین اول. همین‌جا پاسخ بده تا ربات به کاربر برساند.',
+ ai_ov_d:'به سؤال‌های پشتیبانی جواب پیش‌نویس می‌کند، روی سهمیهٔ رایگان کلادفلر.',ai_ov_sw:'روشن یا خاموش کردن دستیار هوش مصنوعی',
+ ai_ov_draft:'پیش‌نویس برای بازبینی',ai_ov_auto:'کاملاً خودکار',
+ ai_ov_of:'از حدود {n} پاسخ رایگان امروز',ai_ov_pct:'{n}٪ از سهمیهٔ رایگان روزانه مصرف شده',
+ ai_ov_out:'سهمیهٔ رایگان تمام شد. {n} سؤال پیش‌نویس هوش مصنوعی نگرفت. همه به گروه ادمین رسیدند، پس چیزی از دست نرفته.',
+ ai_ov_later:'سهمیه در ادامهٔ روز دوباره آزاد می‌شود.',
+ ai_ov_off_d:'هوش مصنوعی خاموش است. سؤال‌های پشتیبانی مستقیم و بدون پیش‌نویس به گروه ادمین می‌روند.',ai_ov_off_used:'امروز {n} پاسخ پیش‌نویس کرده بود.',
+ ai_ov_settings:'تنظیمات',
  qa_draft:'پیش‌نویس هوش مصنوعی',qa_send_draft:'ارسال پیش‌نویس',qa_edit_send:'ویرایش و ارسال',qa_approve_c:'پیش‌نویس هوش مصنوعی همین‌طور که هست برای کاربر ارسال شود؟',
  qa_unsure:'مدل مطمئن نبود، با دقت بخوانید',qa_approve_cu:'مدل درباره این جواب مطمئن نبود و ممکن است چیزی از خودش ساخته باشد. با این حال همین‌طور برای کاربر ارسال شود؟',
  ai_mode_l:'حالت',ai_mode_draft:'پیش‌نویس برای بازبینی: هوش مصنوعی جواب را پیش‌نویس می‌کند، تیم شما بررسی و ارسال می‌کند (تا وقتی داده کم است پیشنهاد می‌شود)',ai_mode_auto:'کاملا خودکار: جواب‌های مطمئن مستقیم برای کاربر می‌رود',
@@ -679,7 +723,7 @@ var GUIDE={en:[
  {h:'🚀 How users install their panel',intro:'What a user experiences when they tap Install, good to know when you help someone:',s:[
   'They need a free <b>Cloudflare account</b> (the bot links to sign-up).',
   'They tap <b>Get my token</b>; a pre-filled Cloudflare page opens. They scroll down, <b>Continue to summary</b>, <b>Create Token</b>, and <b>Copy</b> it.',
-  'They paste the token into the chat. The bot <b>deletes it instantly</b> and never stores it, then builds the panel on their own account (~1 min).',
+  'They paste the token into the chat. The bot <b>deletes it instantly</b> and never stores it, then builds the panel on their own account (about 1 min).',
   'The bot returns their panel address and a button to set their admin password.']},
 ],
 fa:[
@@ -778,7 +822,10 @@ function rel(ts){if(!ts)return'';var t=Date.parse(ts.indexOf('T')<0?ts.replace('
 
 async function loadStats(){
  var b=$('ovrefresh');if(b)b.disabled=true;
- var s=await api('GET','overview').catch(function(){return null});
+ // The AI card needs the live toggle state, which only /config knows.
+ var got=await Promise.all([api('GET','overview').catch(function(){return null}),
+  api('GET','config').catch(function(){return null})]);
+ var s=got[0],cfg=got[1];
  if(b)b.disabled=false;
  if(!s||s.error)return;
  var loc=lang==='fa'?'fa-IR':'en-US';
@@ -795,6 +842,9 @@ async function loadStats(){
   tile(s.questions||0,'st_qa',fmt('ov_sub_ai',rate),IC.msg);
  var mini=function(k,v,c){return '<div class="mini"><span class="dot '+c+'"></span><div><div class="v">'+nf(v)+'</div><div class="k">'+T(k)+'</div></div></div>'};
  $('ministats').innerHTML=mini('st_ai',s.aiAnswered,'info')+mini('st_human',s.humanAnswered,'ok')+mini('st_wait',s.waiting,'warn')+mini('st_banned',s.banned,'bad');
+ // Without /config we cannot know whether the AI is on, and a toggle showing the
+ // wrong state is worse than no card, so hide it in that case.
+ renderAi(cfg?s.ai:null,!!cfg&&cfg.ai_enabled!=='0',(cfg&&cfg.ai_mode)||'draft');
 
  var days=s.days||[],max=1;
  days.forEach(function(d){max=Math.max(max,d.users,d.questions)});
@@ -830,6 +880,51 @@ async function loadStats(){
    '<div class="body"><div class="qt" dir="auto">'+esc(q)+'</div>'+draft+
    '<div class="meta"><span>'+esc(String(r.lang||'').toUpperCase())+'</span><span>'+rel(r.created_at)+'</span></div></div>'+
    btns+'</div>'}).join('');
+}
+
+// Today's AI spend against the free Workers AI allowance, plus the on/off
+// switch. The operator funds this out of pocket, so the count leads and the
+// tone stays plain: colour only ramps once the allowance is nearly gone.
+function renderAi(a,on,mode){
+ var c=$('aicard');if(!c)return;
+ if(!a){c.classList.add('hidden');return}
+ c.classList.remove('hidden');
+ var out=a.blocked>0,pct=Math.max(0,Math.min(100,+a.pct||0));
+ c.classList.toggle('bad',on&&out);
+ c.classList.toggle('warn',on&&!out&&pct>=75);
+ var sw=$('aisw');sw.checked=on;sw.setAttribute('aria-label',T('ai_ov_sw'));
+ // Mode and allowance both mean nothing while the AI is off, so the off state
+ // drops them rather than greying them out.
+ var chip=$('aimode');chip.classList.toggle('hidden',!on);
+ chip.textContent=T(mode==='auto'?'ai_ov_auto':'ai_ov_draft');
+ var body='';
+ if(!on){
+  body='<div class="ai-off">'+T('ai_ov_off_d')+(a.calls?' '+fmt('ai_ov_off_used',a.calls):'')+'</div>';
+ }else{
+  if(out)body+='<div class="note bad">'+fmt('ai_ov_out',a.blocked)+'</div>';
+  body+='<div class="ai-hero"><span class="n">'+nf(a.calls)+'</span><span class="of">'+fmt('ai_ov_of',a.freeCalls)+'</span></div>'+
+   '<div class="meter" role="img" aria-label="'+esc(fmt('ai_ov_pct',pct))+'"><i style="width:'+pct+'%"></i></div>';
+ }
+ body+='<div class="ai-foot">'+(on&&(out||pct>=75)?'<span>'+T('ai_ov_later')+'</span>':'')+
+  '<button class="btn ghost sm" type="button" onclick="goSettings()">'+T('ai_ov_settings')+'</button></div>';
+ $('aibody').innerHTML=body;
+}
+
+// Flip the AI straight from the Overview. POST /config merges per key, so
+// sending only this one leaves every other setting untouched.
+async function aiToggle(on){
+ var sw=$('aisw');sw.disabled=true;
+ var r=await api('POST','config',{ai_enabled:on?'1':'0'}).catch(function(){return null});
+ sw.disabled=false;
+ if(r&&r.ok){toast(T('saved'));loadStats()}
+ else{sw.checked=!on;toast('Error')}
+}
+
+function goSettings(){
+ var b=document.querySelector('.nav-item[data-p=settings]');if(b)nav(b);
+ var c=$('aiset');if(!c)return;
+ var rm=window.matchMedia&&matchMedia('(prefers-reduced-motion:reduce)').matches;
+ c.scrollIntoView({behavior:rm?'auto':'smooth',block:'start'});
 }
 
 // Answer a support question from the panel. The reply is delivered to the
