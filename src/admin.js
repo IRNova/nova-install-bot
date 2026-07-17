@@ -3,7 +3,7 @@
 
 import { tg, send, esc } from "./telegram.js";
 import { getConfig, setConfig, listFaq, listSections, stats, overview, markBlocked, listUsers, setBanned, getQa, getUserLang, setQaAnswer, isBanned } from "./db.js";
-import { suggestFaqs } from "./ai.js";
+import { suggestFaqs, aiEnabled } from "./ai.js";
 import { contactKb } from "./bot.js";
 import { t } from "./i18n.js";
 import { DASHBOARD_HTML, LOGIN_HTML } from "./admin_ui.js";
@@ -181,7 +181,9 @@ async function handleApi(request, env, ctx, res, method) {
   // ── faq ──
   // Draft FAQ entries from real support questions (inserted disabled for review).
   if (res === "faq-suggest" && method === "POST") {
-    if (!env.ANTHROPIC_API_KEY && !env.AI) return json({ error: "no_ai" }, 400);
+    // Respects the AI toggle, not just the presence of a provider: turning the
+    // AI off has to stop every call, and this is the most expensive one.
+    if (!(await aiEnabled(env))) return json({ error: "no_ai" }, 400);
     try {
       const drafts = await suggestFaqs(env);
       return json({ ok: true, added: drafts.length });
