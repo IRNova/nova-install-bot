@@ -133,6 +133,46 @@ export async function markQaResolved(env, qaId) {
   await env.DB.prepare("UPDATE qa_log SET resolved = 1 WHERE id = ?").bind(qaId).run();
 }
 
+// ── AI spend ────────────────────────────────────────────────────────────────
+
+// Neurons are not reported per call, so we count what is: calls and tokens.
+// Measured 2026-07-16 on llama-3.3-70b-fp8-fast: 10,415 neurons over 92 calls
+// and ~507k tokens. Both ratios below come from that day, and both are
+// estimates the panel labels as such.
+export const NEURONS_PER_CALL = 113;
+export const FREE_NEURONS_PER_DAY = 10000;
+
+const utcDay = () => new Date().toISOString().slice(0, 10);
+
+export async function bumpAiUsage(env, { tokens = 0, blocked = false } = {}) {
+  const day = utcDay();
+  await env.DB.prepare(
+    `INSERT INTO ai_usage (day, calls, tokens, blocked) VALUES (?, ?, ?, ?)
+     ON CONFLICT(day) DO UPDATE SET
+       calls = calls + excluded.calls,
+       tokens = tokens + excluded.tokens,
+       blocked = blocked + excluded.blocked`
+  ).bind(day, blocked ? 0 : 1, tokens, blocked ? 1 : 0).run();
+}
+
+// Today's AI spend, shaped for the panel. `pct` is share of the free daily
+// allowance; `blocked` > 0 means the allowance ran out and users got no drafts.
+export async function aiUsageToday(env) {
+  const r = await env.DB.prepare("SELECT calls, tokens, blocked FROM ai_usage WHERE day = ?")
+    .bind(utcDay()).first().catch(() => null);
+  const calls = (r && r.calls) || 0;
+  const neurons = calls * NEURONS_PER_CALL;
+  return {
+    calls,
+    tokens: (r && r.tokens) || 0,
+    blocked: (r && r.blocked) || 0,
+    neurons,
+    freeNeurons: FREE_NEURONS_PER_DAY,
+    freeCalls: Math.floor(FREE_NEURONS_PER_DAY / NEURONS_PER_CALL),
+    pct: Math.min(100, Math.round((neurons / FREE_NEURONS_PER_DAY) * 100)),
+  };
+}
+
 export async function getQa(env, qaId) {
   return env.DB.prepare("SELECT * FROM qa_log WHERE id = ?").bind(qaId).first();
 }
@@ -203,7 +243,8 @@ export async function overview(env) {
     };
   });
 
-  return { ...base, waiting: waiting.n, humanAnswered: human.n, days, recent };
+  const ai = await aiUsageToday(env).catch(() => null);
+  return { ...base, waiting: waiting.n, humanAnswered: human.n, days, recent, ai };
 }
 
 export async function stats(env) {
