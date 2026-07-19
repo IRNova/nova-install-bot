@@ -170,7 +170,8 @@ async function handleApi(request, env, ctx, res, method) {
   const CONFIG_KEYS = ["welcome", "welcome_en", "welcome_fa", "welcome_image",
     "contact_group_id", "contact_enabled", "faq_enabled",
     "join_required", "join_channel", "support_text", "support_links",
-    "ai_enabled", "ai_mode", "ai_model", "ai_cf_model"];
+    "ai_enabled", "ai_mode", "ai_model", "ai_cf_model",
+    "community_group_id", "community_gate", "community_cleanup"];
   if (res === "config" && method === "GET") {
     const out = {};
     for (const k of CONFIG_KEYS) out[k] = await getConfig(env, k, "");

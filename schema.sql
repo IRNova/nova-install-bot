@@ -66,6 +66,17 @@ CREATE TABLE IF NOT EXISTS qa_log (
   answered_at TEXT
 );
 
+-- Logged community-group messages, so the nightly sweep knows what it may
+-- delete (bots cannot enumerate history or delete messages over 48h old).
+CREATE TABLE IF NOT EXISTS group_messages (
+  chat_id    TEXT NOT NULL,
+  message_id INTEGER NOT NULL,
+  ts         INTEGER NOT NULL,
+  keep       INTEGER DEFAULT 0,
+  PRIMARY KEY (chat_id, message_id)
+);
+CREATE INDEX IF NOT EXISTS idx_group_messages_ts ON group_messages (ts);
+
 -- What the AI spends per UTC day, so the panel can show it beside the switch.
 CREATE TABLE IF NOT EXISTS ai_usage (
   day     TEXT PRIMARY KEY,   -- UTC date, YYYY-MM-DD
@@ -87,4 +98,7 @@ INSERT OR IGNORE INTO config (key, value) VALUES
   ('welcome_image', 'https://nova-install-bot.bitter-flower-1b15.workers.dev/banner.jpg'),
   ('ai_enabled', '1'),
   ('ai_mode', 'draft'),
-  ('ai_model', 'claude-opus-4-8');
+  ('ai_model', 'claude-opus-4-8'),
+  ('community_group_id', ''),
+  ('community_gate', '1'),
+  ('community_cleanup', '0');

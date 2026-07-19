@@ -26,6 +26,11 @@ export async function handleUpdate(update, env) {
     return handleGroupReply(msg, env);
   }
 
+  const communityGroup = await getConfig(env, "community_group_id", "");
+  if (communityGroup && String(msg.chat.id) === String(communityGroup)) {
+    return handleCommunityMessage(msg, env);
+  }
+
   if (msg.chat.type !== "private") {
     if ((msg.text || "").toLowerCase().startsWith("/id")) {
       await send(env, msg.chat.id, `This chat's ID:\n<code>${msg.chat.id}</code>`);
@@ -713,4 +718,137 @@ async function handleGroupReply(msg, env) {
       reply_markup: contactKb(userId, banned, true),
     }).catch(() => {});
   }
+}
+
+// ── Community group: membership gate + nightly cleanup ───────────────────────
+
+// A message counts as a channel post to keep if Telegram auto-forwarded it from
+// the linked channel, or it was manually forwarded from that channel.
+function isChannelPost(msg, chanSlug) {
+  if (msg.is_automatic_forward) return true;
+  const src = msg.forward_from_chat;
+  if (src && src.type === "channel") {
+    const u = (src.username || "").toLowerCase();
+    if (chanSlug && u === chanSlug.toLowerCase()) return true;
+    if (msg.sender_chat && msg.sender_chat.id === src.id) return true;
+  }
+  return false;
+}
+
+// Record a community message so the nightly sweep knows it exists. keep = 1
+// means a channel post the sweep must never delete.
+async function logGroupMsg(env, chatId, messageId, keep) {
+  await env.DB.prepare(
+    "INSERT OR IGNORE INTO group_messages (chat_id, message_id, ts, keep) VALUES (?, ?, ?, ?)"
+  ).bind(String(chatId), messageId, Date.now(), keep ? 1 : 0).run().catch(() => {});
+}
+
+// Group admins (and the group owner) post freely, gate or not. Cached 15 min.
+async function isGroupAdmin(env, chatId, userId) {
+  const key = `gadmin_${chatId}_${userId}`;
+  if (await getConfig(env, key, "")) return true;
+  const r = await tg(env, "getChatMember", { chat_id: chatId, user_id: userId }).catch(() => null);
+  const st = r && r.ok && r.result && r.result.status;
+  const admin = st === "creator" || st === "administrator";
+  if (admin) await setConfig(env, key, "1");
+  return admin;
+}
+
+async function handleCommunityMessage(msg, env) {
+  const chatId = msg.chat.id;
+
+  // /id still works here so an admin can read the group's own id.
+  if ((msg.text || "").toLowerCase().startsWith("/id")) {
+    await send(env, chatId, `This chat's ID:\n<code>${chatId}</code>`);
+    return;
+  }
+
+  // Service messages (joins, leaves, pins) get logged so the sweep can clear
+  // them too, but they are not gated.
+  if (msg.new_chat_members || msg.left_chat_member || msg.new_chat_title ||
+      msg.pinned_message || msg.new_chat_photo) {
+    await logGroupMsg(env, chatId, msg.message_id, false);
+    return;
+  }
+
+  const from = msg.from;
+  if (!from || from.is_bot) {
+    // Anonymous admins and channel posts arrive without a normal `from`.
+    const chan = channelSlug(await getConfig(env, "join_channel", ""));
+    await logGroupMsg(env, chatId, msg.message_id, isChannelPost(msg, chan));
+    return;
+  }
+
+  const chan = channelSlug(await getConfig(env, "join_channel", ""));
+  const keep = isChannelPost(msg, chan);
+  await logGroupMsg(env, chatId, msg.message_id, keep);
+  if (keep) return;
+
+  // Membership gate: non-members lose their message until they join. Group
+  // admins are exempt. requireMember fails OPEN, so if the bot is not a channel
+  // admin the check errors and nobody is gated (a config mistake cannot wipe
+  // the group); it starts working once the bot can actually read membership.
+  if ((await getConfig(env, "community_gate", "1")) !== "1") return;
+  if (await isGroupAdmin(env, chatId, from.id)) return;
+  const m = await requireMember(env, from.id);
+  if (m.ok) return;
+  await deleteMessage(env, chatId, msg.message_id).catch(() => {});
+  await notifyGate(env, chatId, from, m.chan);
+}
+
+// One short "join the channel first" notice per non-member, rate-limited to 10
+// minutes so a spammer cannot flood the group with notices. The notice is
+// logged so the nightly sweep clears it as well.
+async function notifyGate(env, chatId, from, chan) {
+  const key = `gate_note_${from.id}`;
+  const last = Number(await getConfig(env, key, "0"));
+  if (Date.now() - last < 10 * 60 * 1000) return;
+  await setConfig(env, key, String(Date.now()));
+  const name = esc(from.first_name || "there");
+  const link = chan ? `https://t.me/${chan}` : "";
+  const text = `👋 <a href="tg://user?id=${from.id}">${name}</a>, ` +
+    `to chat here please join our channel first / برای گفتگو ابتدا در کانال ما عضو شوید` +
+    (link ? `\n${link}` : "");
+  const sent = await send(env, chatId, text).catch(() => null);
+  if (sent && sent.ok && sent.result) {
+    await logGroupMsg(env, chatId, sent.result.message_id, false);
+  }
+}
+
+// Nightly sweep: delete the day's community messages except channel posts.
+// Telegram only lets a bot delete messages under 48h old that it logged, so we
+// work from group_messages and cap the run to stay inside the cron's budget.
+export async function sweepCommunityGroup(env) {
+  if ((await getConfig(env, "community_cleanup", "0")) !== "1") return { skipped: "off" };
+  const chatId = await getConfig(env, "community_group_id", "");
+  if (!chatId) return { skipped: "no group" };
+
+  const now = Date.now();
+  const under48h = now - 47 * 3600 * 1000;
+  const CAP = 200;
+  const { results } = await env.DB.prepare(
+    "SELECT message_id FROM group_messages WHERE chat_id = ? AND keep = 0 AND ts >= ? " +
+    "ORDER BY message_id DESC LIMIT ?"
+  ).bind(String(chatId), under48h, CAP + 1).all().catch(() => ({ results: [] }));
+  const rows = results || [];
+  const capped = rows.length > CAP;
+  const todo = rows.slice(0, CAP);
+
+  let deleted = 0;
+  for (const row of todo) {
+    const r = await deleteMessage(env, chatId, row.message_id).catch(() => null);
+    // Drop the row either way: a message over 48h or already gone will not come
+    // back, so keeping it would only make the next sweep retry it forever.
+    await env.DB.prepare("DELETE FROM group_messages WHERE chat_id = ? AND message_id = ?")
+      .bind(String(chatId), row.message_id).run().catch(() => {});
+    if (r && r.ok) deleted++;
+    await new Promise((res) => setTimeout(res, 45)); // ~22/s, under Telegram's limit
+  }
+
+  // Prune anything older than 48h (undeletable) so the table stays small.
+  await env.DB.prepare("DELETE FROM group_messages WHERE ts < ?")
+    .bind(now - 48 * 3600 * 1000).run().catch(() => {});
+
+  if (capped) console.log(`community sweep hit the ${CAP}-message cap; more remain for the next run`);
+  return { deleted, considered: todo.length, capped };
 }

@@ -11,6 +11,9 @@
   "compatibility_date": "2024-09-23",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
+  // Nightly community-group cleanup. 20:30 UTC = 00:00 in Iran (a fixed UTC+3:30,
+  // no daylight saving since 2022).
+  "triggers": { "crons": ["30 20 * * *"] },
   "vars": {
     // Public config — safe to commit. The worker.js the bot installs on the
     // user's account, and the pre-filled Cloudflare token page.
