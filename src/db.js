@@ -116,11 +116,15 @@ export async function setQaAnswer(env, qaId, answer, source) {
 
 // Record an admin's group reply as the (human) answer to the question the
 // card carries. A human answer always wins over an earlier AI answer.
-export async function setQaAnswerByCard(env, cardMsgId, answer) {
+// source defaults to 'human' (a real answer the KB should learn from). Pass
+// 'photo' for a captionless image reply: it clears the question from the
+// Waiting inbox but stays out of the knowledge pack, which only pulls
+// human/approved answers.
+export async function setQaAnswerByCard(env, cardMsgId, answer, source = "human") {
   await env.DB.prepare(
-    `UPDATE qa_log SET answer = ?, source = 'human', answered_at = datetime('now')
+    `UPDATE qa_log SET answer = ?, source = ?, answered_at = datetime('now')
      WHERE id = (SELECT qa_id FROM contact_map WHERE group_msg_id = ?)`
-  ).bind(answer, cardMsgId).run();
+  ).bind(answer, source, cardMsgId).run();
 }
 
 export async function setQaDraft(env, qaId, draft, sure) {

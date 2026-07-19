@@ -668,14 +668,23 @@ async function whois(env, msg) {
 
 async function handleGroupReply(msg, env) {
   const reply = msg.reply_to_message;
-  if (!reply || !msg.text) return;
+  // A reply carries either text or a photo (with an optional caption). Anything
+  // else (sticker, voice, and so on) is not something we relay.
+  const photo = msg.photo && msg.photo.length ? msg.photo[msg.photo.length - 1].file_id : null;
+  const caption = (msg.caption || "").trim();
+  if (!reply || (!msg.text && !photo)) return;
   const row = await env.DB.prepare(
     "SELECT user_id, card_msg_id FROM contact_map WHERE group_msg_id = ?"
   ).bind(reply.message_id).first();
   if (!row) return;
   const userId = row.user_id;
   const lang = (await getUserLang(env, userId)) || "en";
-  const res = await send(env, userId, `${t(lang, "reply_prefix")}\n\n${esc(msg.text)}`);
+  const prefix = t(lang, "reply_prefix");
+  // Photo goes as a photo (largest size), the caption prefixed so the user
+  // knows it is from support. A plain text reply keeps the original path.
+  const res = photo
+    ? await sendPhoto(env, userId, photo, caption ? `${prefix}\n\n${esc(caption)}` : prefix)
+    : await send(env, userId, `${prefix}\n\n${esc(msg.text)}`);
   if (res && res.ok === false) {
     if (res.error_code === 403) await markBlocked(env, userId);
     await send(env, msg.chat.id, `⚠️ Couldn't deliver (user may have blocked the bot).`, {
@@ -691,9 +700,13 @@ async function handleGroupReply(msg, env) {
     await env.DB.prepare(
       "UPDATE contact_map SET replied = 1 WHERE group_msg_id IN (?, ?)"
     ).bind(reply.message_id, cardId).run().catch(() => {});
-    // Record the delivered reply as the human answer to the question this
-    // card carries, so the AI learns from it and the FAQ suggester sees it.
-    await setQaAnswerByCard(env, cardId, msg.text).catch(() => {});
+    // Record the delivered reply as the human answer to the question this card
+    // carries, so the AI learns from it. A photo with no caption has no text to
+    // learn from: mark it answered (source 'photo') so it leaves the Waiting
+    // inbox, but keep it out of the knowledge pack.
+    const answerText = msg.text || caption;
+    if (answerText) await setQaAnswerByCard(env, cardId, answerText).catch(() => {});
+    else await setQaAnswerByCard(env, cardId, "🖼", "photo").catch(() => {});
     const banned = await isBanned(env, userId);
     await tg(env, "editMessageReplyMarkup", {
       chat_id: msg.chat.id, message_id: cardId,
