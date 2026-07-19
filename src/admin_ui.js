@@ -64,6 +64,7 @@ code{font-family:ui-monospace,'SF Mono',SFMono-Regular,Menlo,monospace;font-size
 .nav-item:hover{background:color-mix(in srgb,var(--tx) 4%,transparent);color:var(--tx)}
 .nav-item.on{background:color-mix(in srgb,var(--tx) 6%,transparent);color:var(--tx);font-weight:600}
 .nav-item.on::before{content:'';position:absolute;inset-inline-start:0;top:9px;bottom:9px;width:3px;border-radius:0 3px 3px 0;background:var(--grad)}
+.nav-badge{margin-inline-start:auto;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--wn);color:#fff;font-size:11.5px;font-weight:700;line-height:20px;text-align:center;font-variant-numeric:tabular-nums}
 html[dir=rtl] .nav-item.on::before{border-radius:3px 0 0 3px}
 .nav-item.on svg{opacity:1;color:var(--ac)}
 .side-foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--bd)}
@@ -407,6 +408,7 @@ export const DASHBOARD_HTML = HEAD("Nova Bot Admin") + `<body>${THEME_BOOT}
   <div class="nav-label" data-k="manage">Manage</div>
   <nav class="nav">
    <button class="nav-item on" data-p="stats" onclick="nav(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="8"/><rect x="12" y="6" width="3" height="12"/><rect x="17" y="13" width="3" height="5"/></svg><span data-k="stats">Overview</span></button>
+   <button class="nav-item" data-p="inbox" onclick="nav(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg><span data-k="inbox">Waiting</span><span class="nav-badge hidden" id="inboxbadge">0</span></button>
    <button class="nav-item" data-p="faq" onclick="nav(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12" y2="17"/></svg><span data-k="faq">FAQ</span></button>
    <button class="nav-item" data-p="sections" onclick="nav(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg><span data-k="sections">Sections</span></button>
    <button class="nav-item" data-p="users" onclick="nav(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span data-k="users">Users</span></button>
@@ -463,6 +465,15 @@ export const DASHBOARD_HTML = HEAD("Nova Bot Admin") + `<body>${THEME_BOOT}
     <div class="card-h"><div class="hgroup"><h3 data-k="ov_recent">Recent support questions</h3><div class="sub" data-k="ov_recent_d">The latest messages users sent to support, newest first.</div></div></div>
     <div id="qfeed"></div>
    </div>
+  </div>
+
+  <!-- Waiting inbox: every unanswered question, oldest backlog included -->
+  <div class="pane" data-pane="inbox">
+   <div class="ovbar">
+    <span class="muted" id="inboxupd"></span>
+    <button class="btn ghost sm" id="inboxrefresh" onclick="loadInbox()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg><span data-k="ov_refresh">Refresh</span></button>
+   </div>
+   <div class="card"><div id="inboxfeed"></div></div>
   </div>
 
   <!-- FAQ -->
@@ -599,8 +610,10 @@ export const DASHBOARD_HTML = HEAD("Nova Bot Admin") + `<body>${THEME_BOOT}
 </div>
 <div class="toast" id="toast" role="status" aria-live="polite"></div>
 <script>
-var I={en:{manage:'Manage',help:'Help',guide:'Guide',stats:'Overview',faq:'FAQ',sections:'Sections',users:'Users',settings:'Settings',broadcast:'Broadcast',theme:'Theme',
+var I={en:{manage:'Manage',help:'Help',guide:'Guide',stats:'Overview',inbox:'Waiting',faq:'FAQ',sections:'Sections',users:'Users',settings:'Settings',broadcast:'Broadcast',theme:'Theme',
  logout:'Log out',menu:'Menu',skip:'Skip to content',u_search:'Search name, username or ID',
+ ptitle_inbox:'Waiting',psub_inbox:'Questions still needing a reply',
+ inbox_count:'{n} waiting',inbox_none:'Nothing waiting. Every question has been answered.',
  ptitle_stats:'Overview',psub_stats:'How Nova Bot is doing, at a glance',ptitle_faq:'FAQ',psub_faq:'Questions users can browse',
  ptitle_sections:'Menu sections',psub_sections:'Custom buttons on the bot menu',ptitle_settings:'Settings',psub_settings:'Welcome text and contact',
  ptitle_broadcast:'Broadcast',psub_broadcast:'Message every user',ptitle_guide:'Guide',psub_guide:'How each part works',
@@ -639,8 +652,10 @@ var I={en:{manage:'Manage',help:'Help',guide:'Guide',stats:'Overview',faq:'FAQ',
  bc:'Broadcast',bc_d:'Send a message to everyone who has used the bot. HTML allowed. Sends in the background.',bc_send:'Send to all users',
  edit:'Edit',hide:'Hide',show:'Show',del:'Delete',hidden:'hidden',none_faq:'No questions yet.',none_sec:'No sections yet.',
  saved:'Saved',added:'Added',deleted:'Deleted',sending:'Sending to',fill:'Please fill the fields',confirm_del:'Delete this?',confirm_bc:'Send to all users?'},
-fa:{manage:'مدیریت',help:'راهنما',guide:'راهنما',stats:'نمای کلی',faq:'سؤالات',sections:'بخش‌ها',users:'کاربران',settings:'تنظیمات',broadcast:'همگانی',theme:'پوسته',
+fa:{manage:'مدیریت',help:'راهنما',guide:'راهنما',stats:'نمای کلی',inbox:'در انتظار',faq:'سؤالات',sections:'بخش‌ها',users:'کاربران',settings:'تنظیمات',broadcast:'همگانی',theme:'پوسته',
  logout:'خروج',menu:'منو',skip:'پرش به محتوا',u_search:'جست‌وجوی نام، یوزرنیم یا آیدی',
+ ptitle_inbox:'در انتظار',psub_inbox:'سؤال‌هایی که هنوز جواب نگرفته‌اند',
+ inbox_count:'{n} در انتظار',inbox_none:'چیزی در انتظار نیست. به همه سؤال‌ها جواب داده شده.',
  ptitle_stats:'نمای کلی',psub_stats:'وضعیت ربات در یک نگاه',ptitle_faq:'سؤالات متداول',psub_faq:'سؤال‌هایی که کاربران می‌بینند',
  ptitle_sections:'بخش‌های منو',psub_sections:'دکمه‌های سفارشی منوی ربات',ptitle_settings:'تنظیمات',psub_settings:'متن خوش‌آمد و تماس',
  ptitle_broadcast:'پیام همگانی',psub_broadcast:'ارسال به همهٔ کاربران',ptitle_guide:'راهنما',psub_guide:'هر بخش چطور کار می‌کند',
@@ -808,7 +823,7 @@ function renderGuide(){var g=GUIDE[lang]||GUIDE.en;$('guidebox').innerHTML=g.map
 function nav(btn){cur=btn.dataset.p;document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('on'));btn.classList.add('on');
  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.dataset.pane===cur));
  $('ptitle').textContent=T('ptitle_'+cur);$('psub').textContent=T('psub_'+cur);$('app').classList.remove('open');
- if(cur==='stats')loadStats();if(cur==='faq')loadFaq();if(cur==='sections')loadSections();if(cur==='users')loadUsers();if(cur==='settings')loadConfig();if(cur==='guide')renderGuide()}
+ if(cur==='stats')loadStats();if(cur==='inbox')loadInbox();if(cur==='faq')loadFaq();if(cur==='sections')loadSections();if(cur==='users')loadUsers();if(cur==='settings')loadConfig();if(cur==='guide')renderGuide()}
 
 $('lg').onclick=function(e){var b=e.target.closest('button');if(b){lang=b.dataset.l;localStorage.setItem('nova-lang',lang);applyLang()}};
 $('theme').onclick=function(){theme=theme==='dark'?'light':'dark';localStorage.setItem('nova-theme',theme);applyTheme()};
@@ -842,6 +857,7 @@ async function loadStats(){
   tile(s.questions||0,'st_qa',fmt('ov_sub_ai',rate),IC.msg);
  var mini=function(k,v,c){return '<div class="mini"><span class="dot '+c+'"></span><div><div class="v">'+nf(v)+'</div><div class="k">'+T(k)+'</div></div></div>'};
  $('ministats').innerHTML=mini('st_ai',s.aiAnswered,'info')+mini('st_human',s.humanAnswered,'ok')+mini('st_wait',s.waiting,'warn')+mini('st_banned',s.banned,'bad');
+ setInboxBadge(s.waiting||0);
  // Without /config we cannot know whether the AI is on, and a toggle showing the
  // wrong state is worse than no card, so hide it in that case.
  renderAi(cfg?s.ai:null,!!cfg&&cfg.ai_enabled!=='0',(cfg&&cfg.ai_mode)||'draft');
@@ -860,26 +876,54 @@ async function loadStats(){
    '<div class="bars"><i style="height:'+h1+'%"></i><i class="q" style="height:'+h2+'%"></i></div>'+
    '<span class="dl">'+dl+'</span></div>'}).join('');
 
- var ST={ai:{c:'info',k:'s_ai'},human:{c:'ok',k:'s_human'},waiting:{c:'warn',k:'s_wait'}};
- var rec=s.recent||[];window._rec=rec;
- $('qfeed').innerHTML=!rec.length?emptyBox('ov_none'):rec.map(function(r){
-  var st=ST[r.status]||ST.waiting;
-  var q=String(r.question||'');if(q.length>140)q=q.slice(0,140)+'…';
-  var hasDraft=r.status==='waiting'&&r.draft;
-  // An unsure draft is still worth showing, but it leads with Edit and send:
-  // the model tends to invent details on questions the knowledge base misses.
-  var unsure=hasDraft&&!r.draft_sure;
-  var draft=hasDraft?'<div class="draftbox'+(unsure?' unsure':'')+'" dir="auto"><span class="dlabel">'+
-    T('qa_draft')+(unsure?' <span class="warn">'+T('qa_unsure')+'</span>':'')+'</span>'+esc(r.draft)+'</div>':'';
-  var send='<button class="btn'+(unsure?' ghost':'')+' sm" onclick="qaApprove('+(+r.id)+')">'+T('qa_send_draft')+'</button>';
-  var edit='<button class="btn'+(unsure?'':' ghost')+' sm" onclick="qaReply('+(+r.id)+')">'+T('qa_edit_send')+'</button>';
-  var btns=hasDraft
-   ?'<div class="btncol">'+(unsure?edit+send:send+edit)+'</div>'
-   :'<div class="btncol"><button class="btn ghost sm" onclick="qaReply('+(+r.id)+')">'+IC.reply+T('qa_reply')+'</button></div>';
-  return '<div class="qrow"><span class="chip '+st.c+'"><span class="dot"></span>'+T(st.k)+'</span>'+
-   '<div class="body"><div class="qt" dir="auto">'+esc(q)+'</div>'+draft+
-   '<div class="meta"><span>'+esc(String(r.lang||'').toUpperCase())+'</span><span>'+rel(r.created_at)+'</span></div></div>'+
-   btns+'</div>'}).join('');
+ var rec=s.recent||[];
+ rememberQa(rec);
+ $('qfeed').innerHTML=!rec.length?emptyBox('ov_none'):rec.map(qrowHTML).join('');
+}
+
+// One support question row, shared by the Overview feed and the Waiting inbox.
+var ST={ai:{c:'info',k:'s_ai'},human:{c:'ok',k:'s_human'},waiting:{c:'warn',k:'s_wait'}};
+function qrowHTML(r){
+ var st=ST[r.status]||ST.waiting;
+ var q=String(r.question||'');if(q.length>140)q=q.slice(0,140)+'…';
+ var hasDraft=r.status==='waiting'&&r.draft;
+ // An unsure draft is still worth showing, but it leads with Edit and send:
+ // the model tends to invent details on questions the knowledge base misses.
+ var unsure=hasDraft&&!r.draft_sure;
+ var draft=hasDraft?'<div class="draftbox'+(unsure?' unsure':'')+'" dir="auto"><span class="dlabel">'+
+   T('qa_draft')+(unsure?' <span class="warn">'+T('qa_unsure')+'</span>':'')+'</span>'+esc(r.draft)+'</div>':'';
+ var send='<button class="btn'+(unsure?' ghost':'')+' sm" onclick="qaApprove('+(+r.id)+')">'+T('qa_send_draft')+'</button>';
+ var edit='<button class="btn'+(unsure?'':' ghost')+' sm" onclick="qaReply('+(+r.id)+')">'+T('qa_edit_send')+'</button>';
+ var btns=hasDraft
+  ?'<div class="btncol">'+(unsure?edit+send:send+edit)+'</div>'
+  :'<div class="btncol"><button class="btn ghost sm" onclick="qaReply('+(+r.id)+')">'+IC.reply+T('qa_reply')+'</button></div>';
+ return '<div class="qrow"><span class="chip '+st.c+'"><span class="dot"></span>'+T(st.k)+'</span>'+
+  '<div class="body"><div class="qt" dir="auto">'+esc(q)+'</div>'+draft+
+  '<div class="meta"><span>'+esc(String(r.lang||'').toUpperCase())+'</span><span>'+rel(r.created_at)+'</span></div></div>'+
+  btns+'</div>';
+}
+
+// qaReply / qaApprove look questions up by id, so both feeds keep a shared map.
+window._qaById={};
+function rememberQa(rows){(rows||[]).forEach(function(r){window._qaById[r.id]=r})}
+
+// The Waiting inbox: the full backlog of unanswered questions, not just the
+// last 8 the Overview shows. This is where the team clears its queue.
+async function loadInbox(){
+ var b=$('inboxrefresh');if(b)b.disabled=true;
+ var rows=await api('GET','qa-waiting').catch(function(){return null});
+ if(b)b.disabled=false;
+ if(!rows||rows.error)rows=[];
+ rememberQa(rows);
+ setInboxBadge(rows.length);
+ var loc=lang==='fa'?'fa-IR':'en-US';
+ $('inboxupd').textContent=fmt('inbox_count',rows.length);
+ $('inboxfeed').innerHTML=!rows.length?emptyBox('inbox_none'):rows.map(qrowHTML).join('');
+}
+
+function setInboxBadge(n){
+ var b=$('inboxbadge');if(!b)return;
+ b.textContent=nf(n);b.classList.toggle('hidden',!n);
 }
 
 // Today's AI spend against the free Workers AI allowance, plus the on/off
@@ -927,22 +971,25 @@ function goSettings(){
  c.scrollIntoView({behavior:rm?'auto':'smooth',block:'start'});
 }
 
+// After answering, refresh whichever list the click came from so the row clears.
+function refreshQa(){if(cur==='inbox')loadInbox();else loadStats()}
+
 // Answer a support question from the panel. The reply is delivered to the
 // user in Telegram and saved as the human answer, which the AI learns from.
 async function qaReply(id){
- var r=(window._rec||[]).find(function(x){return x.id===id});
+ var r=window._qaById[id];
  var txt=prompt(T('qa_reply_p')+(r?'\\n\\n'+r.question:''),(r&&r.draft)||'');
  if(txt===null)return;txt=txt.trim();if(!txt)return toast(T('fill'));
  var res=await api('POST','qa-reply',{id:id,text:txt}).catch(function(){return null});
- if(res&&res.ok){toast(T('qa_sent'));loadStats()}
+ if(res&&res.ok){toast(T('qa_sent'));refreshQa()}
  else toast(res&&res.error==='undeliverable'?T('qa_fail'):'Error')}
 
 // Send the stored AI draft exactly as written (recorded as an approved answer).
 async function qaApprove(id){
- var r=(window._rec||[]).find(function(x){return x.id===id});
+ var r=window._qaById[id];
  if(!confirm(T(r&&!r.draft_sure?'qa_approve_cu':'qa_approve_c')))return;
  var res=await api('POST','qa-approve',{id:id}).catch(function(){return null});
- if(res&&res.ok){toast(T('qa_sent'));loadStats()}
+ if(res&&res.ok){toast(T('qa_sent'));refreshQa()}
  else toast(res&&res.error==='undeliverable'?T('qa_fail'):'Error')}
 
 async function loadUsers(){var q=encodeURIComponent(($('usearch').value||'').trim());var list=await api('GET','users'+(q?('?q='+q):''));

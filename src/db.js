@@ -193,6 +193,25 @@ export async function listAnsweredQa(env, { sources = null, limit = 40 } = {}) {
   return results || [];
 }
 
+// Every unanswered question, newest first, with its draft, for the Waiting
+// inbox. Unlike the Overview feed (last 8, any status) this is the full backlog
+// the team still has to clear. Question text is untrusted; the panel escapes it.
+export async function listWaitingQa(env, { limit = 200 } = {}) {
+  const { results } = await env.DB.prepare(
+    "SELECT id, question, lang, draft, draft_sure, created_at FROM qa_log " +
+    "WHERE answer IS NULL OR answer = '' ORDER BY id DESC LIMIT ?"
+  ).bind(limit).all().catch(() => ({ results: [] }));
+  return (results || []).map((r) => ({
+    id: r.id,
+    question: String(r.question || "").slice(0, 2000),
+    lang: r.lang || "en",
+    status: "waiting",
+    draft: r.draft ? String(r.draft) : "",
+    draft_sure: r.draft_sure === 1,
+    created_at: r.created_at,
+  }));
+}
+
 // Everything the Overview pane needs in one payload: the base counters, support
 // pipeline counts, a 14-day activity series, and the latest support questions.
 // qa_log may not exist until migration 005 runs; every qa query degrades to zero.

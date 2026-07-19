@@ -2,7 +2,7 @@
 // All routes live under /admin. Auth = an HMAC-signed cookie keyed on ADMIN_PASSWORD.
 
 import { tg, send, esc } from "./telegram.js";
-import { getConfig, setConfig, listFaq, listSections, stats, overview, markBlocked, listUsers, setBanned, getQa, getUserLang, setQaAnswer, isBanned } from "./db.js";
+import { getConfig, setConfig, listFaq, listSections, stats, overview, listWaitingQa, markBlocked, listUsers, setBanned, getQa, getUserLang, setQaAnswer, isBanned } from "./db.js";
 import { suggestFaqs, aiEnabled } from "./ai.js";
 import { contactKb } from "./bot.js";
 import { t } from "./i18n.js";
@@ -104,6 +104,11 @@ async function handleApi(request, env, ctx, res, method) {
   // Richer payload for the Overview pane: counters + 14-day series + recent Q&A.
   if (res === "overview" && method === "GET") {
     return json(await overview(env));
+  }
+
+  // The full backlog of unanswered questions for the Waiting inbox.
+  if (res === "qa-waiting" && method === "GET") {
+    return json(await listWaitingQa(env, { limit: 200 }));
   }
 
   // Answer a support question straight from the panel: deliver via the bot in
