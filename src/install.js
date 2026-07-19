@@ -40,6 +40,22 @@ export async function cf(method, path, token, body, ctype) {
   return { status: r.status, json, text: txt };
 }
 
+// Tell novaproxy.online's counter about a real deploy. The id is a hash of the
+// panel host, matching the web installer and Nova-Wizard, so the same panel is
+// tallied once no matter which channel deployed it. Opaque + best-effort: the
+// server never learns the worker URL, and a failure never blocks the deploy.
+export async function reportInstall(host) {
+  try {
+    const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode("nova-panel:" + host));
+    const id = "w_" + Array.from(new Uint8Array(buf)).slice(0, 16).map((b) => b.toString(16).padStart(2, "0")).join("");
+    await fetch("https://novaproxy.online/api/stats", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ type: "install", id }),
+    });
+  } catch {}
+}
+
 export const cfOk = (res) => !!(res.json && res.json.success === true);
 export function cfErr(res) {
   try {
@@ -170,6 +186,7 @@ export async function install(env, chatId, token, userId, lang = "en") {
     const online = await waitForOnline(panelUrl);
     await set("online", "done");
 
+    await reportInstall(`${workerName}.${subName}.workers.dev`).catch(() => {});
     if (userId) await bumpInstalls(env, userId).catch(() => {});
     await sendResult(env, chatId, panelUrl, online, lang);
   } catch (e) {
