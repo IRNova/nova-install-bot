@@ -718,7 +718,14 @@ var GUIDE={en:[
   '<b>Panels built</b>: how many Nova panels were installed through the bot, and by how many different builders.',
   '<b>Questions</b> counts every support message, with the share the AI answered on its own. The small row below splits them into AI answered, team answered and still waiting.',
   'The <b>14-day chart</b> shows new users and support questions per day; hover a day for the exact numbers.',
-  '<b>Recent support questions</b> lists the latest messages with their status: 🤖 answered by the AI, 👤 answered by your team, ⏳ still waiting in your admin group.']},
+  '<b>Recent support questions</b> lists the latest messages with their status: 🤖 answered by the AI, 👤 answered by your team, ⏳ still waiting. The full backlog lives in the <b>Waiting</b> tab.']},
+ {h:'⏳ Waiting, clearing the backlog',intro:'The <b>Waiting</b> tab lists every question that has not been answered yet, oldest included, not just the latest few. The number badge on the tab is how many are open.',s:[
+  'Tap <b>Reply</b> on a question to write an answer. It is delivered to the user in the bot, in their language, and saved so the AI can learn from it.',
+  'When the AI is on it may attach a <b>draft</b>. <b>Send draft</b> delivers it as written; <b>Edit and send</b> opens it so you can fix it first. A draft the model was unsure about is marked, so read those before sending.',
+  'Answering here or in your admin group both clear the question from this list.']},
+ {h:'🖼️ Replying with a photo',s:[
+  'In your admin group, <b>reply to a forwarded message with a photo</b> (a screenshot, a settings picture) and the bot sends that photo to the user.',
+  'Add a caption to the photo to send words with it. A photo with no caption is still delivered and the question is marked answered.']},
  {h:'❓ FAQ',s:[
   'Add a <b>Question</b> and its <b>Answer</b>, then tap <b>Add question</b>. It appears in the bot under the FAQ button.',
   'Answers accept simple HTML: <code>&lt;b&gt;bold&lt;/b&gt;</code>, <code>&lt;i&gt;italic&lt;/i&gt;</code>, <code>&lt;a href="…"&gt;link&lt;/a&gt;</code>, <code>&lt;code&gt;</code>.',
@@ -750,6 +757,11 @@ var GUIDE={en:[
   'To block someone you only know by ID, paste it into <b>Block by user ID</b> (the ID shows on every message in your contact group).',
   'You can also tap <b>🚫 Block user</b> right on a message in the contact group.',
   'A blocked user gets a short "no access" notice and the bot ignores everything else from them, until you unblock.']},
+ {h:'👥 Community group moderation',intro:'The bot can moderate a public community group, separate from your admin group. One-time setup in Settings, Community group:',s:[
+  'Add <b>@IRNovaProxy_Bot</b> to the community group as an <b>admin</b>, with the <b>delete messages</b> and <b>ban users</b> rights ticked.',
+  'Send <code>/id</code> in that group, then paste the ID into <b>Community group chat ID</b> and Save.',
+  '<b>Only channel members can chat</b>: a person who is not in your channel has their messages removed until they join, with one short notice. Group admins are exempt. For this the bot must also be an <b>admin of your channel</b> (same as the channel lock); if it cannot check membership, nobody is gated, so this is safe to leave on.',
+  '<b>Clear the group every night</b>: at midnight Iran time the bot deletes the day\\'s messages but keeps posts forwarded from your channel. Telegram only lets a bot remove messages under 48 hours old that it saw, so this clears recent chatter, not the whole history. It is off by default.']},
  {h:'🚀 How users install their panel',intro:'What a user experiences when they tap Install, good to know when you help someone:',s:[
   'They need a free <b>Cloudflare account</b> (the bot links to sign-up).',
   'They tap <b>Get my token</b>; a pre-filled Cloudflare page opens. They scroll down, <b>Continue to summary</b>, <b>Create Token</b>, and <b>Copy</b> it.',
@@ -765,7 +777,14 @@ fa:[
   '<b>پنل ساخته‌شده</b>: چند پنل نوا از طریق ربات نصب شده و توسط چند سازندهٔ متفاوت.',
   '<b>سؤال‌ها</b> همهٔ پیام‌های پشتیبانی را می‌شمارد، همراه با سهمی که هوش مصنوعی خودش پاسخ داده. ردیف کوچک زیر آن، پاسخ هوش مصنوعی، پاسخ ادمین و در انتظار را جدا نشان می‌دهد.',
   '<b>نمودار ۱۴ روزه</b> کاربران جدید و سؤال‌های پشتیبانی هر روز را نشان می‌دهد؛ برای عدد دقیق، نشانگر را روی هر روز نگه دار.',
-  '<b>سؤال‌های اخیر پشتیبانی</b> آخرین پیام‌ها را با وضعیتشان نشان می‌دهد: 🤖 پاسخ هوش مصنوعی، 👤 پاسخ تیم شما، ⏳ هنوز در گروه ادمین منتظر است.']},
+  '<b>سؤال‌های اخیر پشتیبانی</b> آخرین پیام‌ها را با وضعیتشان نشان می‌دهد: 🤖 پاسخ هوش مصنوعی، 👤 پاسخ تیم شما، ⏳ هنوز در انتظار. کل صفِ باقی‌مانده در تب <b>در انتظار</b> است.']},
+ {h:'⏳ در انتظار، خالی‌کردن صف',intro:'تب <b>در انتظار</b> همهٔ سؤال‌هایی را که هنوز جواب نگرفته‌اند نشان می‌دهد، از جمله قدیمی‌ترها، نه فقط چند تای آخر. عدد روی تب یعنی چند تا باز مانده.',s:[
+  'روی <b>پاسخ</b> یک سؤال بزن و جواب را بنویس. به زبان کاربر در ربات تحویل می‌شود و ذخیره می‌شود تا هوش مصنوعی از آن یاد بگیرد.',
+  'وقتی هوش مصنوعی روشن است ممکن است یک <b>پیش‌نویس</b> بچسباند. <b>ارسال پیش‌نویس</b> همان‌طور که هست می‌فرستد؛ <b>ویرایش و ارسال</b> بازش می‌کند تا اول اصلاحش کنی. پیش‌نویسی که مدل مطمئن نبوده علامت دارد، آن‌ها را قبل از ارسال بخوان.',
+  'جواب‌دادن اینجا یا در گروه ادمین، هر دو سؤال را از این لیست پاک می‌کنند.']},
+ {h:'🖼️ پاسخ با عکس',s:[
+  'در گروه ادمین، <b>روی پیام فوروارد‌شده با یک عکس ریپلای کن</b> (اسکرین‌شات، تصویر تنظیمات) و ربات همان عکس را برای کاربر می‌فرستد.',
+  'اگر روی عکس کپشن بگذاری، متن هم همراهش می‌رود. عکس بدون کپشن هم تحویل می‌شود و سؤال جواب‌داده‌شده علامت می‌خورد.']},
  {h:'❓ سؤالات متداول',s:[
   'یک <b>سؤال</b> و <b>پاسخ</b> آن را وارد کن و <b>افزودن سؤال</b> را بزن. زیر دکمهٔ سؤالات در ربات ظاهر می‌شود.',
   'پاسخ‌ها از HTML ساده پشتیبانی می‌کنند: <code>&lt;b&gt;پررنگ&lt;/b&gt;</code>، <code>&lt;i&gt;مورب&lt;/i&gt;</code>، <code>&lt;a href="…"&gt;لینک&lt;/a&gt;</code>، <code>&lt;code&gt;</code>.',
@@ -797,6 +816,11 @@ fa:[
   'برای مسدود کردن کسی که فقط آیدی‌اش را داری، در <b>مسدود کردن با آیدی</b> بچسبانش (آیدی روی هر پیام در گروه تماس دیده می‌شود).',
   'همچنین می‌توانی روی هر پیام در گروه تماس دکمهٔ <b>🚫 مسدود کردن</b> را بزنی.',
   'کاربر مسدودشده یک پیام کوتاه «عدم دسترسی» می‌گیرد و ربات بقیهٔ پیام‌هایش را نادیده می‌گیرد، تا وقتی آزادش کنی.']},
+ {h:'👥 مدیریت گروه عمومی',intro:'ربات می‌تواند یک گروه عمومی را مدیریت کند، جدا از گروه ادمین. تنظیم یک‌باره در تنظیمات، گروه عمومی:',s:[
+  '<b>@IRNovaProxy_Bot</b> را به گروه عمومی به‌عنوان <b>ادمین</b> اضافه کن، با دسترسی‌های <b>حذف پیام</b> و <b>بن کاربر</b>.',
+  'در آن گروه <code>/id</code> بفرست، بعد آیدی را در <b>آیدی گروه عمومی</b> بچسبان و ذخیره کن.',
+  '<b>فقط اعضای کانال بتوانند چت کنند</b>: پیام کسی که عضو کانالت نیست حذف می‌شود تا وقتی عضو شود، با یک اعلان کوتاه. ادمین‌های گروه مستثنا هستند. برای این کار ربات باید <b>ادمین کانالت</b> هم باشد (مثل قفل کانال)؛ اگر نتواند عضویت را بررسی کند، هیچ‌کس محدود نمی‌شود، پس روشن‌گذاشتنش امن است.',
+  '<b>هر شب گروه را پاک کن</b>: ساعت ۱۲ شب به وقت ایران، ربات پیام‌های آن روز را حذف می‌کند ولی پست‌های فوروارد‌شده از کانالت را نگه می‌دارد. تلگرام فقط اجازه می‌دهد ربات پیام‌های زیر ۴۸ ساعت را که دیده حذف کند، پس این کار چت‌های اخیر را پاک می‌کند، نه کل تاریخچه را. به‌طور پیش‌فرض خاموش است.']},
  {h:'🚀 کاربران چطور پنل نصب می‌کنند',intro:'وقتی کاربری روی نصب می‌زند چه می‌بیند، برای کمک به دیگران خوب است بدانی:',s:[
   'به یک <b>حساب رایگان Cloudflare</b> نیاز دارد (ربات لینک ثبت‌نام را می‌دهد).',
   '<b>گرفتن توکن</b> را می‌زند؛ یک صفحهٔ از‌پیش‌پرشدهٔ Cloudflare باز می‌شود. پایین می‌رود، <b>Continue to summary</b>، <b>Create Token</b>، و آن را <b>Copy</b> می‌کند.',
