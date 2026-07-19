@@ -139,10 +139,13 @@ export async function markQaResolved(env, qaId) {
 
 // ── AI spend ────────────────────────────────────────────────────────────────
 
-// Neurons are not reported per call, so we count what is: calls and tokens.
-// Measured 2026-07-16 on llama-3.3-70b-fp8-fast: 10,415 neurons over 92 calls
-// and ~507k tokens. Both ratios below come from that day, and both are
-// estimates the panel labels as such.
+// Neurons are not reported per call, so we estimate from tokens, which are.
+// Measured 2026-07-16 on llama-3.3-70b-fp8-fast: 10,415 neurons over ~507k
+// tokens = about 0.0205 neurons/token (and 113 neurons/call on the old pack).
+// Estimating from tokens self-corrects when the pack size changes, e.g. after
+// retrieval shrank it; the per-call figure is only the fallback when a response
+// does not report token usage.
+export const NEURONS_PER_TOKEN = 10415 / 507000;
 export const NEURONS_PER_CALL = 113;
 export const FREE_NEURONS_PER_DAY = 10000;
 
@@ -165,14 +168,21 @@ export async function aiUsageToday(env) {
   const r = await env.DB.prepare("SELECT calls, tokens, blocked FROM ai_usage WHERE day = ?")
     .bind(utcDay()).first().catch(() => null);
   const calls = (r && r.calls) || 0;
-  const neurons = calls * NEURONS_PER_CALL;
+  const tokens = (r && r.tokens) || 0;
+  // Prefer the token-based estimate; fall back to per-call when tokens are 0
+  // (a response that did not report usage).
+  const neurons = tokens > 0
+    ? Math.round(tokens * NEURONS_PER_TOKEN)
+    : calls * NEURONS_PER_CALL;
+  // Live capacity: how many more answers today's average call leaves room for.
+  const perCall = calls > 0 ? neurons / calls : NEURONS_PER_CALL;
   return {
     calls,
-    tokens: (r && r.tokens) || 0,
+    tokens,
     blocked: (r && r.blocked) || 0,
     neurons,
     freeNeurons: FREE_NEURONS_PER_DAY,
-    freeCalls: Math.floor(FREE_NEURONS_PER_DAY / NEURONS_PER_CALL),
+    freeCalls: Math.max(calls, Math.floor(FREE_NEURONS_PER_DAY / perCall)),
     pct: Math.min(100, Math.round((neurons / FREE_NEURONS_PER_DAY) * 100)),
   };
 }

@@ -10,6 +10,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { getConfig, listFaq, listAnsweredQa, bumpAiUsage } from "./db.js";
+import { rankByRelevance } from "./retrieve.js";
 
 export async function aiEnabled(env) {
   if (!env.ANTHROPIC_API_KEY && !env.AI) return false;
@@ -133,19 +134,28 @@ const ANSWER_SCHEMA = {
   additionalProperties: false,
 };
 
-async function knowledgePack(env) {
+async function knowledgePack(env, question) {
+  // The AI draws on everything the team has ever answered plus the whole FAQ,
+  // but only the entries most relevant to THIS question go into the prompt.
+  // That keeps the pack small (cost and latency scale with prompt size) while
+  // still learning from all of it, and it scales as the FAQ and history grow.
+  // Ranking is lexical and runs here, so it costs nothing.
   const faq = await listFaq(env).catch(() => []);
-  // Keep the pack small: prompt size is the main driver of Workers AI latency,
-  // and the whole flow must finish well inside the post-response time budget.
-  const humanQa = await listAnsweredQa(env, { sources: ["human", "approved"], limit: 25 }).catch(() => []);
+  const hist = await listAnsweredQa(env, { sources: ["human", "approved"], limit: 300 }).catch(() => []);
+  const pool = [
+    // Curated FAQ answers outrank raw chat answers on a tie via the boost.
+    ...faq.map((f) => ({ question: f.question, answer: f.answer, faq: true, boost: 1.4 })),
+    ...hist.map((h) => ({ question: h.question, answer: h.answer, faq: false })),
+  ];
+  const picked = question
+    ? rankByRelevance(question, pool, 10)
+    : pool.slice(0, 8); // no question (e.g. a warm-up): fall back to a sample
+
   let kb = NOVA_REFERENCE;
-  if (faq.length) {
-    kb += "\n\nOfficial FAQ entries:\n" +
-      faq.map((f) => `Q: ${f.question}\nA: ${f.answer}`).join("\n---\n");
-  }
-  if (humanQa.length) {
-    kb += "\n\nPast questions answered by the human support team (gold standard):\n" +
-      humanQa.map((r) => `Q: ${String(r.question).slice(0, 300)}\nA: ${String(r.answer).slice(0, 600)}`).join("\n---\n");
+  if (picked.length) {
+    kb += "\n\nRelevant knowledge, chosen because it resembles the current " +
+      "question (official FAQ entries and answers the human support team has given):\n" +
+      picked.map((r) => `Q: ${String(r.question).slice(0, 300)}\nA: ${String(r.answer).slice(0, 700)}`).join("\n---\n");
   }
   return kb;
 }
@@ -153,7 +163,7 @@ async function knowledgePack(env) {
 // Try to answer a support question. Returns {confident, answer} or null on any
 // failure (caller falls back to human support).
 export async function autoAnswer(env, question, lang) {
-  const kb = await knowledgePack(env);
+  const kb = await knowledgePack(env, question);
   const language = lang === "fa" ? "Persian (Farsi)" : lang === "ru" ? "Russian" : "English";
   const out = await runJson(env, {
     schema: ANSWER_SCHEMA,
