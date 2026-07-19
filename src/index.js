@@ -7,7 +7,7 @@
 // Secrets (wrangler secret put, never committed):
 //   BOT_TOKEN, WEBHOOK_SECRET, ADMIN_PASSWORD
 
-import { handleUpdate } from "./bot.js";
+import { handleUpdate, sweepCommunityGroup } from "./bot.js";
 import { handleAdmin } from "./admin.js";
 import { BANNER_JPEG_B64 } from "./banner.js";
 import { autoAnswer } from "./ai.js";
@@ -74,5 +74,15 @@ export default {
     }
 
     return new Response("not found", { status: 404 });
+  },
+
+  // Cron (20:30 UTC = 00:00 Iran): sweep the day's community-group chatter,
+  // keeping channel forwards. No-op unless community_cleanup is on.
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(sweepCommunityGroup(env).then((r) => {
+      console.log("community sweep:", JSON.stringify(r));
+    }).catch((e) => {
+      console.error("community sweep error:", e && e.stack || e);
+    }));
   },
 };

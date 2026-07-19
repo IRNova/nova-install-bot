@@ -589,6 +589,19 @@ export const DASHBOARD_HTML = HEAD("Nova Bot Admin") + `<body>${THEME_BOOT}
      <div class="form-foot"><button class="btn" onclick="saveConfig()" data-k="save">Save</button></div>
     </div>
    </div>
+   <div class="card">
+    <div class="card-h"><div class="hgroup"><h3 data-k="comm">Community group</h3><div class="sub" data-k="comm_d">A public group the bot can moderate. Different from the admin group above.</div></div></div>
+    <div class="card-pad">
+     <label data-k="comm_group" for="community_group_id">Community group chat ID</label>
+     <input id="community_group_id" placeholder="-1001234567890" dir="ltr">
+     <div class="desc" style="margin:8px 0 0" data-k="comm_group_d">Add <b>@IRNovaProxy_Bot</b> to the group as an admin (with delete and ban rights), send <code>/id</code> there, and paste the ID here. For the join-gate, the bot must also be an admin of your channel. Leave empty to turn moderation off.</div>
+     <label class="switch"><input type="checkbox" id="community_gate"> <span data-k="comm_gate">Only channel members can chat</span></label>
+     <div class="desc" style="margin:6px 0 0" data-k="comm_gate_d">A non-member's messages are removed until they join the channel set above. Group admins are exempt.</div>
+     <label class="switch"><input type="checkbox" id="community_cleanup"> <span data-k="comm_clean">Clear the group every night</span></label>
+     <div class="desc" style="margin:6px 0 0" data-k="comm_clean_d">At midnight Iran time, delete the day's messages except posts from the channel. Telegram only lets a bot remove messages under 48 hours old that it saw, so this clears recent chatter, not the whole history.</div>
+     <div class="form-foot"><button class="btn" onclick="saveConfig()" data-k="save">Save</button></div>
+    </div>
+   </div>
   </div>
 
   <!-- BROADCAST -->
@@ -647,6 +660,7 @@ var I={en:{manage:'Manage',help:'Help',guide:'Guide',stats:'Overview',inbox:'Wai
  welcome:'Welcome message',welcome_d:'Shown at the top of the main menu. Leave blank for the default. Set each language separately.',save:'Save',
  w_img:'Banner image URL (optional)',w_img_d:'Shown above the welcome text as a banner. Leave blank for a text-only menu. Max about 5 MB, any public image URL.',
  contact:'Contact us',c_enable:'Enable "Contact us"',c_group:'Admin group chat ID',c_group_d:'Create a Telegram group, add <b>@IRNovaProxy_Bot</b> as an admin, send <code>/id</code> in the group, and paste the ID here. Reply to a forwarded message to answer that user.',show_faq:'Show FAQ in menu',
+ comm:'Community group',comm_d:'A public group the bot can moderate. Different from the admin group above.',comm_group:'Community group chat ID',comm_group_d:'Add <b>@IRNovaProxy_Bot</b> to the group as an admin (with delete and ban rights), send <code>/id</code> there, and paste the ID here. For the join-gate, the bot must also be an admin of your channel. Leave empty to turn moderation off.',comm_gate:'Only channel members can chat',comm_gate_d:"A non-member's messages are removed until they join the channel set above. Group admins are exempt.",comm_clean:'Clear the group every night',comm_clean_d:'At midnight Iran time, delete the day\\'s messages except posts from the channel. Telegram only lets a bot remove messages under 48 hours old that it saw, so this clears recent chatter, not the whole history.',
  chan:'Required channel',chan_d:'Users must join this channel before they can use the bot.',chan_note:'⚠️ <b>The bot must be an admin of the channel</b> for this to work. Open the channel → Administrators → Add Admin → add <b>@IRNovaProxy_Bot</b> (no permissions needed). Until the bot is a channel admin, the check can\\'t run and everyone is let through.',chan_enable:'Require channel membership',chan_user:'Channel username',
  sup:'Support us',sup_d:"Shown when a user taps 💝 Support us in the bot. If both fields are empty, the bot tells users support isn't set up yet.",sup_text:'Message (HTML allowed, e.g. wallet addresses in &lt;code&gt;)',sup_links:'Link buttons, one per line: Label | https://url',
  bc:'Broadcast',bc_d:'Send a message to everyone who has used the bot. HTML allowed. Sends in the background.',bc_send:'Send to all users',
@@ -689,6 +703,7 @@ fa:{manage:'مدیریت',help:'راهنما',guide:'راهنما',stats:'نما
  welcome:'پیام خوش‌آمد',welcome_d:'بالای منوی اصلی نشان داده می‌شود. برای پیش‌فرض خالی بگذار. هر زبان را جدا تنظیم کن.',save:'ذخیره',
  w_img:'آدرس تصویر بنر (اختیاری)',w_img_d:'به‌عنوان بنر بالای متن خوش‌آمد نشان داده می‌شود. برای منوی فقط‌متنی خالی بگذار. حداکثر حدود ۵ مگابایت، هر آدرس تصویر عمومی.',
  contact:'تماس با ما',c_enable:'فعال‌سازی «تماس با ما»',c_group:'آیدی گروه ادمین',c_group_d:'یک گروه تلگرام بساز، <b>@IRNovaProxy_Bot</b> را ادمین کن، در گروه <code>/id</code> بفرست و آیدی را اینجا بچسبان. برای پاسخ به کاربر، روی پیام فوروارد‌شده ریپلای کن.',show_faq:'نمایش سؤالات در منو',
+ comm:'گروه عمومی',comm_d:'یک گروه عمومی که ربات می‌تواند مدیریتش کند. با گروه ادمین بالا فرق دارد.',comm_group:'آیدی گروه عمومی',comm_group_d:'ربات <b>@IRNovaProxy_Bot</b> را با دسترسی حذف پیام و بن به گروه اضافه کن، در گروه <code>/id</code> بفرست و آیدی را اینجا بچسبان. برای قفل عضویت، ربات باید ادمین کانالت هم باشد. برای خاموش‌کردن مدیریت، خالی بگذار.',comm_gate:'فقط اعضای کانال بتوانند چت کنند',comm_gate_d:'پیام کسی که عضو کانال نیست حذف می‌شود تا وقتی عضو شود. ادمین‌های گروه مستثنا هستند.',comm_clean:'هر شب گروه را پاک کن',comm_clean_d:'ساعت ۱۲ شب به وقت ایران، پیام‌های آن روز به‌جز پست‌های کانال حذف می‌شوند. تلگرام فقط اجازه می‌دهد ربات پیام‌های زیر ۴۸ ساعت را که دیده حذف کند، پس این کار چت‌های اخیر را پاک می‌کند، نه کل تاریخچه را.',
  chan:'کانال اجباری',chan_d:'کاربران باید قبل از استفاده از ربات عضو این کانال شوند.',chan_note:'⚠️ <b>ربات باید ادمین کانال باشد</b> تا این قابلیت کار کند. کانال → مدیران → افزودن مدیر → <b>@IRNovaProxy_Bot</b> را اضافه کن (نیازی به دسترسی نیست). تا وقتی ربات ادمین کانال نباشد، بررسی انجام نمی‌شود و همه عبور داده می‌شوند.',chan_enable:'اجباری بودن عضویت در کانال',chan_user:'یوزرنیم کانال',
  sup:'حمایت از ما',sup_d:'وقتی کاربر در ربات 💝 حمایت از ما را می‌زند نشان داده می‌شود. اگر هر دو فیلد خالی باشند، ربات به کاربران می‌گوید حمایت هنوز تنظیم نشده.',sup_text:'پیام (HTML مجاز، مثلاً آدرس کیف پول داخل <code>)',sup_links:'دکمه‌های لینک، هر خط یکی: عنوان | https://url',
  bc:'پیام همگانی',bc_d:'به همهٔ کسانی که از ربات استفاده کرده‌اند پیام بفرست. HTML مجاز است. در پس‌زمینه ارسال می‌شود.',bc_send:'ارسال به همه',
@@ -1051,14 +1066,16 @@ async function loadConfig(){var c=await api('GET','config');welcome_en.value=c.w
  join_required.checked=c.join_required!=='0';join_channel.value=c.join_channel||'';
  support_text.value=c.support_text||'';support_links.value=c.support_links||'';
  ai_enabled.checked=c.ai_enabled!=='0';ai_model.value=c.ai_model||'claude-opus-4-8';
- ((c.ai_mode||'draft')==='auto'?ai_mode_auto:ai_mode_draft).checked=true}
+ ((c.ai_mode||'draft')==='auto'?ai_mode_auto:ai_mode_draft).checked=true;
+ community_group_id.value=c.community_group_id||'';community_gate.checked=c.community_gate!=='0';community_cleanup.checked=c.community_cleanup==='1'}
 async function saveConfig(){await api('POST','config',{welcome_en:welcome_en.value,welcome_fa:welcome_fa.value,
  welcome_image:welcome_image.value.trim(),
  contact_group_id:contact_group_id.value.trim(),contact_enabled:contact_enabled.checked?'1':'0',faq_enabled:faq_enabled.checked?'1':'0',
  join_required:join_required.checked?'1':'0',join_channel:join_channel.value.trim().replace(/^@/,'').replace(/^https?:\\/\\/t\\.me\\//i,''),
  support_text:support_text.value,support_links:support_links.value,
  ai_enabled:ai_enabled.checked?'1':'0',ai_mode:ai_mode_auto.checked?'auto':'draft',
- ai_model:ai_model.value.trim()||'claude-opus-4-8'});toast(T('saved'))}
+ ai_model:ai_model.value.trim()||'claude-opus-4-8',
+ community_group_id:community_group_id.value.trim(),community_gate:community_gate.checked?'1':'0',community_cleanup:community_cleanup.checked?'1':'0'});toast(T('saved'))}
 
 async function broadcast(){var t=bc.value.trim();if(!t)return toast(T('fill'));if(!confirm(T('confirm_bc')))return;
  var r=await api('POST','broadcast',{text:t});if(r.ok){toast(T('sending')+' '+r.recipients);bc.value=''}else toast('Error')}
