@@ -166,7 +166,7 @@ export const STR = {
       "• <b>With a domain</b>: add one for a trusted certificate, or put Cloudflare in front for the most censorship-resistant path.\n\n" +
       "<b>How:</b>\n" +
       "<b>1.</b> Run this on your VPS over SSH as root:\n" +
-      "<code>bash &lt;(curl -fsSL https://raw.githubusercontent.com/IRNova/Tools/main/nova-node.sh)</code>\n" +
+      "<code>bash &lt;(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node.sh)</code>\n" +
       "It installs everything, opens the firewall, and prints your panel address and admin password.\n" +
       "<b>2.</b> Open that address in your browser (or the Nova app), log in, create a user, and share the link or import it into the Nova app.\n\n" +
       "Your VPS login is never sent anywhere, you run the command yourself on your own server.",
@@ -333,7 +333,7 @@ export const STR = {
       "• <b>با دامنه</b>: برای گواهی معتبر یک دامنه اضافه کن، یا Cloudflare را جلوی سرور بگذار تا مقاوم‌ترین مسیر در برابر فیلترینگ را داشته باشی.\n\n" +
       "<b>چطور:</b>\n" +
       "<b>۱.</b> این را روی VPS خود از طریق SSH و با کاربر root اجرا کن:\n" +
-      "<code>bash &lt;(curl -fsSL https://raw.githubusercontent.com/IRNova/Tools/main/nova-node.sh)</code>\n" +
+      "<code>bash &lt;(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node.sh)</code>\n" +
       "همه چیز را نصب می‌کند، فایروال را باز می‌کند و آدرس پنل و رمز مدیریت را چاپ می‌کند.\n" +
       "<b>۲.</b> آن آدرس را در مرورگر (یا اپ نوا) باز کن، وارد شو، یک کاربر بساز و لینکش را به اشتراک بگذار یا در اپ نوا وارد کن.\n\n" +
       "اطلاعات ورود سرورت هیچ‌جا فرستاده نمی‌شود، دستور را خودت روی سرور خودت اجرا می‌کنی.",
