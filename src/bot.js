@@ -110,6 +110,8 @@ export async function handleUpdate(update, env) {
       return send(env, chatId, `Your ID: <code>${from.id}</code>\nChat ID: <code>${chatId}</code>`);
     case "/contact":
       return startContact(env, chatId, from.id, lang);
+    case "/deploy":
+      return sendDeploy(env, chatId, lang);
     case "/faq":
       return sendFaqList(env, chatId, lang);
     default:
@@ -125,6 +127,7 @@ async function menuMarkup(env, lang) {
   const rows = [
     [{ text: t(lang, "btn_install"), callback_data: "install", style: "success" }],
     [{ text: t(lang, "btn_update"), callback_data: "update", style: "primary" }],
+    [{ text: t(lang, "btn_deploy"), callback_data: "deploy" }],
   ];
   for (const s of await listSections(env)) rows.push([{ text: s.title, callback_data: `sec:${s.id}` }]);
   const appsBtn = { text: t(lang, "btn_apps"), callback_data: "apps" };
@@ -386,6 +389,18 @@ async function handleCallback(cb, env) {
   }
   if (data.startsWith("updg:")) return runUpdate(env, chatId, msgId, cb.from.id, +data.slice(5), lang);
   if (data === "support") return editSupport(env, chatId, msgId, lang);
+  if (data === "deploy")
+    return showView(env, chatId, msgId, t(lang, "deploy_title"), { reply_markup: deployMarkup(lang) });
+  if (data === "dep_panel") {
+    // Same as Install: arm the token-paste state so a pasted token builds the panel.
+    await setConfig(env, `await_token_${cb.from.id}`, "1");
+    await setConfig(env, `await_utoken_${cb.from.id}`, "");
+    return showView(env, chatId, msgId, t(lang, "deploy_panel_text"), { reply_markup: depPanelKeyboard(lang) });
+  }
+  if (data === "dep_vps")
+    return showView(env, chatId, msgId, t(lang, "deploy_vps_text"), { reply_markup: depVpsKeyboard(lang) });
+  if (data === "dep_sub")
+    return showView(env, chatId, msgId, t(lang, "deploy_sub_text"), { reply_markup: depSubKeyboard(lang) });
   if (data === "apps")
     return showView(env, chatId, msgId, t(lang, "apps_title"), { reply_markup: appsKeyboard(lang) });
   if (data === "faq") return editFaqList(env, chatId, msgId, lang);
@@ -447,6 +462,55 @@ function appsKeyboard(lang) {
       backRow(lang),
     ],
   };
+}
+
+// ── Deploy your own Nova ─────────────────────────────────────────────────────
+// A hub mirroring the app's onboarding: build a free Cloudflare panel, connect
+// your own VPS, or just use an existing subscription in the app. The panel
+// option reuses the tested Install flow; the VPS option installs a standalone
+// Nova node (nova-node.sh, its own panel); the subscription option points at
+// the app downloads.
+
+function deployMarkup(lang) {
+  return { inline_keyboard: [
+    [{ text: t(lang, "btn_dep_panel"), callback_data: "dep_panel", style: "success" }],
+    [{ text: t(lang, "btn_dep_vps"), callback_data: "dep_vps" }],
+    [{ text: t(lang, "btn_dep_sub"), callback_data: "dep_sub" }],
+    backRow(lang),
+  ] };
+}
+
+function depBackRow(lang) {
+  return [{ text: t(lang, "btn_back_deploy"), callback_data: "deploy" }];
+}
+
+// Panel path: same buttons as Install (get token / make account) but returns to
+// the deploy hub instead of the main menu.
+function depPanelKeyboard(lang) {
+  return { inline_keyboard: [
+    [{ text: t(lang, "btn_get_token"), url: TOKEN_DEEPLINK, style: "primary" }],
+    [{ text: t(lang, "btn_make_account"), url: "https://dash.cloudflare.com/sign-up" }],
+    depBackRow(lang),
+  ] };
+}
+
+function depVpsKeyboard(lang) {
+  return { inline_keyboard: [
+    [{ text: t(lang, "btn_dep_panel"), callback_data: "dep_panel", style: "primary" }],
+    depBackRow(lang),
+  ] };
+}
+
+function depSubKeyboard(lang) {
+  return { inline_keyboard: [
+    [{ text: t(lang, "btn_android"), url: "https://github.com/IRNova/Nova-Client/releases/latest/download/nova-client.apk", style: "success" }],
+    [{ text: t(lang, "btn_all_dl"), url: "https://github.com/IRNova/Nova-Client/releases", style: "primary" }],
+    depBackRow(lang),
+  ] };
+}
+
+async function sendDeploy(env, chatId, lang) {
+  return send(env, chatId, t(lang, "deploy_title"), { reply_markup: deployMarkup(lang) });
 }
 
 // ── FAQ ─────────────────────────────────────────────────────────────────────
