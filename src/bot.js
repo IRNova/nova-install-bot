@@ -6,12 +6,45 @@ import {
   touchUser, getConfig, setConfig, listFaq, getFaq, listSections, getSection,
   markBlocked, getUserLang, setUserLang, isBanned, setBanned,
   logQuestion, setQaAnswer, setQaAnswerByCard, setQaDraft, markQaResolved, getQa,
+  bumpOffense, setOffenderStatus,
 } from "./db.js";
 import { aiEnabled, autoAnswer } from "./ai.js";
 import { install, TOKEN_DEEPLINK, extractToken } from "./install.js";
 import { startUpdate, runUpdate, loadUpdCtx, clearUpdCtx } from "./update.js";
 import { t, normLang } from "./i18n.js";
 import { gatherUserCard } from "./userinfo.js";
+
+// The bot's profile description (the text shown above "Start bot"). The Latin
+// brand word is wrapped in directional isolates (U+2066 LEFT-TO-RIGHT ISOLATE
+// ... U+2069 POP DIRECTIONAL ISOLATE) and each line is prefixed with an RLM
+// (U+200F RIGHT-TO-LEFT MARK) so the RTL sentence and its punctuation render
+// correctly around it. These are inserted from \u escapes so the source stays
+// clean. Bump PROFILE_SYNC_VER to re-apply on the next sync.
+const PROFILE_SYNC_VER = "2026-07-fa-bidi";
+const NOVA_DESC_FA =
+  "\u200Fنوا پروکسی یک پروژه رایگان و متن‌باز توسط تیم \u2066IRNova\u2069 است.\n" +
+  "\u200Fهدف ما: ارائه اینترنت آزاد و بدون سانسور و رایگان برای همه.";
+
+// Set the bot's description via the Bot API. Idempotent: it only calls Telegram
+// when the stored version differs (or force is set), so it is cheap to trigger.
+// Applied to both the default and the Farsi locale so every viewer gets the
+// corrected text.
+export async function syncBotProfile(env, { force = false } = {}) {
+  if (!env.BOT_TOKEN) return { ok: false, reason: "no BOT_TOKEN" };
+  if (!force && (await getConfig(env, "profile_sync", "")) === PROFILE_SYNC_VER) {
+    return { ok: true, skipped: true, version: PROFILE_SYNC_VER };
+  }
+  const results = {};
+  for (const language_code of ["", "fa"]) {
+    const r = await tg(env, "setMyDescription", {
+      description: NOVA_DESC_FA,
+      ...(language_code ? { language_code } : {}),
+    }).catch((e) => ({ ok: false, description: e && e.message }));
+    results[language_code || "default"] = r && r.ok === true ? "ok" : (r && r.description) || "failed";
+  }
+  await setConfig(env, "profile_sync", PROFILE_SYNC_VER);
+  return { ok: true, version: PROFILE_SYNC_VER, results };
+}
 
 export async function handleUpdate(update, env) {
   if (update.callback_query) return handleCallback(update.callback_query, env);
@@ -50,7 +83,10 @@ export async function handleUpdate(update, env) {
   await touchUser(env, from, normLang(from && from.language_code)).catch(() => {});
   const lang = lang0;
   const text = (msg.text || "").trim();
-  if (!text) return;
+  // A user in the contact flow may send a photo or video (no text) as their
+  // question; let those through so handleContactMessage can relay them.
+  // Everything else below still needs text.
+  if (!text && !contactMedia(msg)) return;
 
   const cmd = text.split(/\s+/)[0].toLowerCase().replace(/@.*$/, "");
   const isCommand = text.startsWith("/");
@@ -495,8 +531,10 @@ function depPanelKeyboard(lang) {
 }
 
 function depVpsKeyboard(lang) {
+  // Nova Server (VPS) install runs in the dedicated installer bot (a Node
+  // service that can SSH and detect nodes); this Worker bot just links to it.
   return { inline_keyboard: [
-    [{ text: t(lang, "btn_dep_panel"), callback_data: "dep_panel", style: "primary" }],
+    [{ text: t(lang, "btn_dep_vps_bot"), url: "https://t.me/NovaServerInstaller_Bot", style: "success" }],
     depBackRow(lang),
   ] };
 }
@@ -587,11 +625,32 @@ export function contactKb(userId, banned, replied, draftQaId = null) {
 // forwarded to the admins, who send or edit the draft from the group card or
 // the panel. Anything else (AI off, no provider, API error) goes to the admin
 // group exactly as before, with no draft attached.
+// An attachment a user can send with (or instead of) their question. Detecting
+// it lets the router accept the message and lets forwardContact relay the real
+// file. The label is only used as a placeholder in the card when there is no
+// caption. copyMessage relays the file itself, so this list just needs to cover
+// what counts as "has an attachment".
+function contactMedia(msg) {
+  if (!msg) return null;
+  if (msg.photo && msg.photo.length) return { kind: "photo", label: "📷 Photo" };
+  if (msg.video) return { kind: "video", label: "🎬 Video" };
+  if (msg.animation) return { kind: "animation", label: "🎬 GIF" };
+  if (msg.document) return { kind: "document", label: "📎 File" };
+  if (msg.voice) return { kind: "voice", label: "🎤 Voice message" };
+  if (msg.video_note) return { kind: "video_note", label: "🎥 Video note" };
+  if (msg.audio) return { kind: "audio", label: "🎵 Audio" };
+  return null;
+}
+
 async function handleContactMessage(env, from, chatId, msg, lang) {
-  const question = (msg.text || "").trim();
+  const media = contactMedia(msg);
+  // A captioned photo or video: treat the caption as the question text.
+  const question = (msg.text || msg.caption || "").trim();
   const qaId = question ? await logQuestion(env, from.id, lang, question).catch(() => null) : null;
 
-  if (question && (await aiEnabled(env))) {
+  // Skip the AI assistant when the message carries an attachment: a text model
+  // can't see it, so a human should look. Attachments always go to the group.
+  if (question && !media && (await aiEnabled(env))) {
     const mode = await getConfig(env, "ai_mode", "draft");
     await tg(env, "sendChatAction", { chat_id: chatId, action: "typing" }).catch(() => {});
     if (mode !== "auto") {
@@ -694,18 +753,46 @@ async function forwardContact(env, from, chatId, msg, lang, { qaId = null, note 
   const group = await getConfig(env, "contact_group_id", "");
   if (!group) { await send(env, chatId, t(lang, "contact_notset")); return {}; }
 
+  const media = contactMedia(msg);
+  const said = (msg.text || msg.caption || "").trim();
   const card = await gatherUserCard(env, from.id, from);
-  const header =
-    (note ? note + "\n\n" : "") +
-    `✉️ <b>New message</b>\n\n` +
-    `“${esc(msg.text || "")}”\n\n` +
-    card.text +
-    `\n\n<i>Tap Reply below, or reply to this message, to answer them.</i>`;
+  const intro = (note ? note + "\n\n" : "") + `✉️ <b>New message</b>\n\n`;
+  const tail = `\n\n<i>Tap Reply below, or reply to this message, to answer them.</i>`;
   const kb = contactKb(from.id, false);
+  // Caption when the attachment itself is the card: the user's words (if any),
+  // then the identity. No "[photo]" placeholder, since the media is right there.
+  const mediaCaption = intro + (said ? `“${esc(said)}”\n\n` : "") + card.text + tail;
+  // Text card (also the fallback when a caption would be too long or the media
+  // type can't carry one): quote the words or a short attachment placeholder.
+  const textHeader =
+    intro + (said ? `“${esc(said)}”` : media ? `<i>[${media.label}]</i>` : "“”") + `\n\n` + card.text + tail;
 
-  // The message admins reply to (mapped back to the user).
-  const sent = await send(env, group, header, { reply_markup: kb });
-  const cardMsgId = sent && sent.result && sent.result.message_id;
+  let cardMsgId = null;
+  if (media) {
+    // Relay the attachment AS the card, so the Reply and Block buttons sit right
+    // on the photo/video the admins see.
+    const copied = await tg(env, "copyMessage", {
+      chat_id: group, from_chat_id: chatId, message_id: msg.message_id,
+      caption: mediaCaption, parse_mode: "HTML", reply_markup: kb,
+    }).catch(() => null);
+    if (copied && copied.ok && copied.result) {
+      cardMsgId = copied.result.message_id;
+    } else {
+      // Caption too long, or a media type that can't carry one (video note):
+      // fall back to a text card with the buttons, then the media beneath it.
+      const sent = await send(env, group, textHeader, { reply_markup: kb });
+      cardMsgId = sent && sent.result && sent.result.message_id;
+      if (cardMsgId) {
+        await tg(env, "copyMessage", {
+          chat_id: group, from_chat_id: chatId, message_id: msg.message_id,
+          reply_to_message_id: cardMsgId,
+        }).catch((e) => console.log("contact: media copy failed", e && e.message));
+      }
+    }
+  } else {
+    const sent = await send(env, group, textHeader, { reply_markup: kb });
+    cardMsgId = sent && sent.result && sent.result.message_id;
+  }
   if (cardMsgId) {
     await env.DB.prepare(
       "INSERT OR REPLACE INTO contact_map (group_msg_id, user_id, card_msg_id, qa_id) VALUES (?, ?, ?, ?)"
@@ -737,11 +824,11 @@ async function whois(env, msg) {
 
 async function handleGroupReply(msg, env) {
   const reply = msg.reply_to_message;
-  // A reply carries either text or a photo (with an optional caption). Anything
-  // else (sticker, voice, and so on) is not something we relay.
-  const photo = msg.photo && msg.photo.length ? msg.photo[msg.photo.length - 1].file_id : null;
+  // A reply carries text or any attachment (photo, video, file, and so on) with
+  // an optional caption. Stickers and the like still aren't relayed.
+  const media = contactMedia(msg);
   const caption = (msg.caption || "").trim();
-  if (!reply || (!msg.text && !photo)) return;
+  if (!reply || (!msg.text && !media)) return;
   const row = await env.DB.prepare(
     "SELECT user_id, card_msg_id FROM contact_map WHERE group_msg_id = ?"
   ).bind(reply.message_id).first();
@@ -749,11 +836,24 @@ async function handleGroupReply(msg, env) {
   const userId = row.user_id;
   const lang = (await getUserLang(env, userId)) || "en";
   const prefix = t(lang, "reply_prefix");
-  // Photo goes as a photo (largest size), the caption prefixed so the user
-  // knows it is from support. A plain text reply keeps the original path.
-  const res = photo
-    ? await sendPhoto(env, userId, photo, caption ? `${prefix}\n\n${esc(caption)}` : prefix)
-    : await send(env, userId, `${prefix}\n\n${esc(msg.text)}`);
+  // An attachment is copied to the user with the support prefix in its caption
+  // so they know who it's from. Video notes can't carry a caption, so the prefix
+  // goes as a separate line first. A plain text reply keeps the original path.
+  let res;
+  if (media) {
+    const canCaption = media.kind !== "video_note";
+    if (!canCaption) await send(env, userId, prefix);
+    res = await tg(env, "copyMessage", {
+      chat_id: userId,
+      from_chat_id: msg.chat.id,
+      message_id: msg.message_id,
+      ...(canCaption
+        ? { caption: caption ? `${prefix}\n\n${esc(caption)}` : prefix, parse_mode: "HTML" }
+        : {}),
+    });
+  } else {
+    res = await send(env, userId, `${prefix}\n\n${esc(msg.text)}`);
+  }
   if (res && res.ok === false) {
     if (res.error_code === 403) await markBlocked(env, userId);
     await send(env, msg.chat.id, `⚠️ Couldn't deliver (user may have blocked the bot).`, {
@@ -770,12 +870,12 @@ async function handleGroupReply(msg, env) {
       "UPDATE contact_map SET replied = 1 WHERE group_msg_id IN (?, ?)"
     ).bind(reply.message_id, cardId).run().catch(() => {});
     // Record the delivered reply as the human answer to the question this card
-    // carries, so the AI learns from it. A photo with no caption has no text to
-    // learn from: mark it answered (source 'photo') so it leaves the Waiting
-    // inbox, but keep it out of the knowledge pack.
+    // carries, so the AI learns from it. An attachment with no caption has no
+    // text to learn from: mark it answered (source 'media') so it leaves the
+    // Waiting inbox, but keep it out of the knowledge pack.
     const answerText = msg.text || caption;
     if (answerText) await setQaAnswerByCard(env, cardId, answerText).catch(() => {});
-    else await setQaAnswerByCard(env, cardId, "🖼", "photo").catch(() => {});
+    else await setQaAnswerByCard(env, cardId, "📎", "media").catch(() => {});
     const banned = await isBanned(env, userId);
     await tg(env, "editMessageReplyMarkup", {
       chat_id: msg.chat.id, message_id: cardId,
@@ -848,6 +948,10 @@ async function handleCommunityMessage(msg, env) {
   await logGroupMsg(env, chatId, msg.message_id, keep);
   if (keep) return;
 
+  // Profanity filter: delete + escalate (warn -> mute -> ban). If it acted on
+  // this message, stop here so the membership gate below does not double-handle.
+  if (await moderateProfanity(env, chatId, msg, from)) return;
+
   // Membership gate: non-members lose their message until they join. Group
   // admins are exempt. requireMember fails OPEN, so if the bot is not a channel
   // admin the check errors and nobody is gated (a config mistake cannot wipe
@@ -877,6 +981,70 @@ async function notifyGate(env, chatId, from, chan) {
   if (sent && sent.ok && sent.result) {
     await logGroupMsg(env, chatId, sent.result.message_id, false);
   }
+}
+
+// Normalize text for the profanity match: lowercase, drop zero-width joiners,
+// and fold common Arabic/Persian letter variants so simple obfuscation
+// (spacing, ك/ک, ي/ی) does not slip a banned word past the filter.
+function normalizeProfanity(s) {
+  return String(s || "")
+    .toLowerCase()
+    .replace(/[\u200b\u200c\u200d\u200e\u200f]/g, "")
+    .replace(/ي/g, "ی").replace(/ك/g, "ک")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+// Profanity moderation. When enabled, a member message that matches the admin
+// wordlist is deleted, the sender gets a strike, and enforcement escalates:
+// early strikes warn, then mute (restrictChatMember), then ban (banChatMember +
+// bot ban). Group admins are exempt. Notices are logged so the nightly sweep
+// clears them. We never expose anyone's account, this only moderates. Returns
+// true when it acted on the message.
+async function moderateProfanity(env, chatId, msg, from) {
+  if ((await getConfig(env, "profanity_on", "0")) !== "1") return false;
+  const raw = msg.text || msg.caption || "";
+  if (!raw) return false;
+  const words = normalizeProfanity(await getConfig(env, "profanity_words", ""))
+    .split(/[\n,،]+/).map((w) => w.trim()).filter(Boolean);
+  if (!words.length) return false;
+  const hay = normalizeProfanity(raw);
+  if (!words.some((w) => hay.includes(w))) return false;
+  if (await isGroupAdmin(env, chatId, from.id).catch(() => false)) return false;
+
+  await deleteMessage(env, chatId, msg.message_id).catch(() => {});
+
+  const n = await bumpOffense(env, from, raw);
+  const muteAt = Math.max(2, Number(await getConfig(env, "profanity_mute", "3")) || 3);
+  const banAt = Math.max(muteAt + 1, Number(await getConfig(env, "profanity_ban", "5")) || 5);
+  const muteMin = Math.max(1, Number(await getConfig(env, "profanity_mute_min", "60")) || 60);
+  const name = `<a href="tg://user?id=${from.id}">${esc(from.first_name || "member")}</a>`;
+
+  let notice;
+  if (n >= banAt) {
+    await tg(env, "banChatMember", { chat_id: chatId, user_id: from.id }).catch(() => {});
+    await setBanned(env, from.id, true).catch(() => {});
+    await setOffenderStatus(env, from.id, "banned", 0).catch(() => {});
+    notice = `🚫 ${name} was removed for repeated abusive messages.\nبه‌دلیل پیام‌های توهین‌آمیز مکرر حذف شد.`;
+  } else if (n >= muteAt) {
+    await tg(env, "restrictChatMember", {
+      chat_id: chatId, user_id: from.id,
+      until_date: Math.floor(Date.now() / 1000) + muteMin * 60,
+      permissions: {
+        can_send_messages: false, can_send_media_messages: false,
+        can_send_other_messages: false, can_add_web_page_previews: false,
+      },
+    }).catch(() => {});
+    await setOffenderStatus(env, from.id, "muted", Date.now() + muteMin * 60000).catch(() => {});
+    notice = `🔇 ${name}, muted ${muteMin} min for abusive language.\nبه‌دلیل زبان توهین‌آمیز ${muteMin} دقیقه بی‌صدا شدی.`;
+  } else {
+    notice = `⚠️ ${name}, please keep it civil, abusive messages are removed.\nلطفاً ادب را رعایت کن؛ پیام‌های توهین‌آمیز حذف می‌شوند.`;
+  }
+  const sent = await send(env, chatId, notice).catch(() => null);
+  if (sent && sent.ok && sent.result) {
+    await logGroupMsg(env, chatId, sent.result.message_id, false).catch(() => {});
+  }
+  return true;
 }
 
 // Nightly sweep: delete the day's community messages except channel posts.
