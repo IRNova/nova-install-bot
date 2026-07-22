@@ -72,7 +72,7 @@ export const STR = {
 
     // contact
     contact_start:
-      "✉️ <b>Contact us</b>\n\nType your message and send it. It goes straight to our team, and we'll reply here.\n\nSend /menu to cancel.",
+      "✉️ <b>Contact us</b>\n\nType your message and send it. You can attach a photo or video too. It goes straight to our team, and we'll reply here.\n\nSend /menu to cancel.",
     contact_disabled: "Contact is currently disabled. Please try again later.",
     contact_notset: "Thanks! But contact isn't set up yet. Please try again later.",
     contact_sent: "✅ Sent! Our team will get back to you here.",
@@ -130,6 +130,7 @@ export const STR = {
       "✅ <b>No domain? No problem.</b> You can set Nova up straight from the app, it connects right to your server. A domain makes things more censorship-resistant, but you don't need one to get online.",
     btn_dep_panel: "🚀 Deploy your own panel (free)",
     btn_dep_vps: "🖥 Connect your VPS",
+    btn_dep_vps_bot: "🚀 Open the installer bot",
     btn_dep_sub: "🔗 Use an existing subscription",
     deploy_panel_text:
       "🚀 <b>Deploy your own panel</b>\n\n" +
@@ -242,7 +243,7 @@ export const STR = {
     btn_back_faq: "⬅️ بازگشت به سؤالات",
 
     contact_start:
-      "✉️ <b>تماس با ما</b>\n\nپیامت را بنویس و بفرست. مستقیم به تیم ما می‌رسد و همین‌جا جوابت را می‌دهیم.\n\nبرای لغو /menu را بفرست.",
+      "✉️ <b>تماس با ما</b>\n\nپیامت را بنویس و بفرست. می‌توانی عکس یا ویدیو هم بفرستی. مستقیم به تیم ما می‌رسد و همین‌جا جوابت را می‌دهیم.\n\nبرای لغو /menu را بفرست.",
     contact_disabled: "تماس در حال حاضر غیرفعال است. لطفاً بعداً دوباره امتحان کن.",
     contact_notset: "ممنون! اما تماس هنوز تنظیم نشده. لطفاً بعداً امتحان کن.",
     contact_sent: "✅ ارسال شد! تیم ما همین‌جا جوابت را می‌دهد.",
@@ -297,6 +298,7 @@ export const STR = {
       "✅ <b>دامنه نداری؟ مشکلی نیست.</b> می‌توانی نوا را مستقیم از داخل اپ راه بیندازی، اپ مستقیم به سرورت وصل می‌شود. دامنه کار را در برابر فیلترینگ مقاوم‌تر می‌کند، اما برای آنلاین شدن لازم نیست.",
     btn_dep_panel: "🚀 ساخت پنل شخصی (رایگان)",
     btn_dep_vps: "🖥 اتصال VPS",
+    btn_dep_vps_bot: "🚀 باز کردن ربات نصب‌کننده",
     btn_dep_sub: "🔗 استفاده از اشتراک آماده",
     deploy_panel_text:
       "🚀 <b>ساخت پنل شخصی</b>\n\n" +
