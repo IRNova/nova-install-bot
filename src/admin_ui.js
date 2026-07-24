@@ -599,8 +599,24 @@ export const DASHBOARD_HTML = HEAD("Nova Bot Admin") + `<body>${THEME_BOOT}
      <div class="desc" style="margin:6px 0 0" data-k="comm_gate_d">A non-member's messages are removed until they join the channel set above. Group admins are exempt.</div>
      <label class="switch"><input type="checkbox" id="community_cleanup"> <span data-k="comm_clean">Clear the group every night</span></label>
      <div class="desc" style="margin:6px 0 0" data-k="comm_clean_d">At midnight Iran time, delete the day's messages except posts from the channel. Telegram only lets a bot remove messages under 48 hours old that it saw, so this clears recent chatter, not the whole history.</div>
+     <label class="switch"><input type="checkbox" id="profanity_on"> <span data-k="prof">Auto-moderate abusive language</span></label>
+     <div class="desc" style="margin:6px 0 0" data-k="prof_d">When a message contains a blocked word, the bot deletes it and gives the sender a strike. Enough strikes mute them, then ban them.</div>
+     <label data-k="prof_words" for="profanity_words">Blocked words, one per line</label>
+     <textarea id="profanity_words" dir="auto" placeholder="idiot&#10;احمق"></textarea>
+     <div class="desc" style="margin:6px 0 0" data-k="prof_words_d">Matched case-insensitively. Persian and Arabic letter variants (like ک/ك and ی/ي) are folded together.</div>
+     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:0 12px;margin-top:4px">
+      <div><label data-k="prof_mute" for="profanity_mute">Mute after N strikes</label><input id="profanity_mute" type="number" min="1" dir="ltr"></div>
+      <div><label data-k="prof_ban" for="profanity_ban">Ban after N strikes</label><input id="profanity_ban" type="number" min="1" dir="ltr"></div>
+      <div><label data-k="prof_mutemin" for="profanity_mute_min">Mute length (minutes)</label><input id="profanity_mute_min" type="number" min="1" dir="ltr"></div>
+     </div>
      <div class="form-foot"><button class="btn" onclick="saveConfig()" data-k="save">Save</button></div>
     </div>
+   </div>
+   <div class="card">
+    <div class="card-h"><div class="hgroup"><h3 data-k="fl">Flagged members</h3><div class="sub" data-k="fl_d">People the profanity filter has flagged. Reset clears strikes; Unmute or Unban reverses enforcement.</div></div>
+     <div class="right"><button class="btn ghost sm" onclick="loadOffenders()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg><span data-k="ov_refresh">Refresh</span></button></div>
+    </div>
+    <div id="offlist"></div>
    </div>
   </div>
 
@@ -661,6 +677,8 @@ var I={en:{manage:'Manage',help:'Help',guide:'Guide',stats:'Overview',inbox:'Wai
  w_img:'Banner image URL (optional)',w_img_d:'Shown above the welcome text as a banner. Leave blank for a text-only menu. Max about 5 MB, any public image URL.',
  contact:'Contact us',c_enable:'Enable "Contact us"',c_group:'Admin group chat ID',c_group_d:'Create a Telegram group, add <b>@IRNovaProxy_Bot</b> as an admin, send <code>/id</code> in the group, and paste the ID here. Reply to a forwarded message to answer that user.',show_faq:'Show FAQ in menu',
  comm:'Community group',comm_d:'A public group the bot can moderate. Different from the admin group above.',comm_group:'Community group chat ID',comm_group_d:'Add <b>@IRNovaProxy_Bot</b> to the group as an admin (with delete and ban rights), send <code>/id</code> there, and paste the ID here. For the join-gate, the bot must also be an admin of your channel. Leave empty to turn moderation off.',comm_gate:'Only channel members can chat',comm_gate_d:"A non-member's messages are removed until they join the channel set above. Group admins are exempt.",comm_clean:'Clear the group every night',comm_clean_d:'At midnight Iran time, delete the day\\'s messages except posts from the channel. Telegram only lets a bot remove messages under 48 hours old that it saw, so this clears recent chatter, not the whole history.',
+ prof:'Auto-moderate abusive language',prof_d:'When a message contains a blocked word, the bot deletes it and gives the sender a strike. Enough strikes mute them, then ban them.',prof_words:'Blocked words, one per line',prof_words_d:'Matched case-insensitively. Persian and Arabic letter variants (like \\u06a9/\\u0643 and \\u06cc/\\u064a) are folded together.',prof_mute:'Mute after N strikes',prof_ban:'Ban after N strikes',prof_mutemin:'Mute length (minutes)',
+ fl:'Flagged members',fl_d:'People the profanity filter has flagged. Reset clears strikes; Unmute or Unban reverses enforcement.',fl_none:'No one has been flagged yet.',fl_strikes:'strikes',fl_active:'active',fl_muted:'muted',fl_banned:'banned',fl_reset:'Reset',fl_unmute:'Unmute',fl_unban:'Unban',
  chan:'Required channel',chan_d:'Users must join this channel before they can use the bot.',chan_note:'⚠️ <b>The bot must be an admin of the channel</b> for this to work. Open the channel → Administrators → Add Admin → add <b>@IRNovaProxy_Bot</b> (no permissions needed). Until the bot is a channel admin, the check can\\'t run and everyone is let through.',chan_enable:'Require channel membership',chan_user:'Channel username',
  sup:'Support us',sup_d:"Shown when a user taps 💝 Support us in the bot. If both fields are empty, the bot tells users support isn't set up yet.",sup_text:'Message (HTML allowed, e.g. wallet addresses in &lt;code&gt;)',sup_links:'Link buttons, one per line: Label | https://url',
  bc:'Broadcast',bc_d:'Send a message to everyone who has used the bot. HTML allowed. Sends in the background.',bc_send:'Send to all users',
@@ -704,6 +722,8 @@ fa:{manage:'مدیریت',help:'راهنما',guide:'راهنما',stats:'نما
  w_img:'آدرس تصویر بنر (اختیاری)',w_img_d:'به‌عنوان بنر بالای متن خوش‌آمد نشان داده می‌شود. برای منوی فقط‌متنی خالی بگذار. حداکثر حدود ۵ مگابایت، هر آدرس تصویر عمومی.',
  contact:'تماس با ما',c_enable:'فعال‌سازی «تماس با ما»',c_group:'آیدی گروه ادمین',c_group_d:'یک گروه تلگرام بساز، <b>@IRNovaProxy_Bot</b> را ادمین کن، در گروه <code>/id</code> بفرست و آیدی را اینجا بچسبان. برای پاسخ به کاربر، روی پیام فوروارد‌شده ریپلای کن.',show_faq:'نمایش سؤالات در منو',
  comm:'گروه عمومی',comm_d:'یک گروه عمومی که ربات می‌تواند مدیریتش کند. با گروه ادمین بالا فرق دارد.',comm_group:'آیدی گروه عمومی',comm_group_d:'ربات <b>@IRNovaProxy_Bot</b> را با دسترسی حذف پیام و بن به گروه اضافه کن، در گروه <code>/id</code> بفرست و آیدی را اینجا بچسبان. برای قفل عضویت، ربات باید ادمین کانالت هم باشد. برای خاموش‌کردن مدیریت، خالی بگذار.',comm_gate:'فقط اعضای کانال بتوانند چت کنند',comm_gate_d:'پیام کسی که عضو کانال نیست حذف می‌شود تا وقتی عضو شود. ادمین‌های گروه مستثنا هستند.',comm_clean:'هر شب گروه را پاک کن',comm_clean_d:'ساعت ۱۲ شب به وقت ایران، پیام‌های آن روز به‌جز پست‌های کانال حذف می‌شوند. تلگرام فقط اجازه می‌دهد ربات پیام‌های زیر ۴۸ ساعت را که دیده حذف کند، پس این کار چت‌های اخیر را پاک می‌کند، نه کل تاریخچه را.',
+ prof:'مدیریت خودکار زبان توهین‌آمیز',prof_d:'وقتی پیامی حاوی واژهٔ مسدود باشد، ربات آن را حذف می‌کند و به فرستنده یک اخطار می‌دهد. با چند اخطار، کاربر بی‌صدا و سپس مسدود می‌شود.',prof_words:'واژه‌های مسدود، هر کدام در یک خط',prof_words_d:'بدون حساسیت به بزرگی و کوچکی حروف بررسی می‌شود. شکل‌های گوناگون حروف فارسی و عربی (مثل ک/ك و ی/ي) یکسان در نظر گرفته می‌شوند.',prof_mute:'بی‌صدا کردن بعد از N اخطار',prof_ban:'مسدود کردن بعد از N اخطار',prof_mutemin:'مدت بی‌صدایی (دقیقه)',
+ fl:'اعضای متخلف',fl_d:'کسانی که فیلتر واژه‌های نامناسب آن‌ها را علامت زده است. «بازنشانی» اخطارها را پاک می‌کند؛ «رفع بی‌صدایی» یا «رفع مسدودی» محدودیت را برمی‌دارد.',fl_none:'هنوز کسی علامت نخورده است.',fl_strikes:'اخطار',fl_active:'فعال',fl_muted:'بی‌صدا',fl_banned:'مسدود',fl_reset:'بازنشانی',fl_unmute:'رفع بی‌صدایی',fl_unban:'رفع مسدودی',
  chan:'کانال اجباری',chan_d:'کاربران باید قبل از استفاده از ربات عضو این کانال شوند.',chan_note:'⚠️ <b>ربات باید ادمین کانال باشد</b> تا این قابلیت کار کند. کانال → مدیران → افزودن مدیر → <b>@IRNovaProxy_Bot</b> را اضافه کن (نیازی به دسترسی نیست). تا وقتی ربات ادمین کانال نباشد، بررسی انجام نمی‌شود و همه عبور داده می‌شوند.',chan_enable:'اجباری بودن عضویت در کانال',chan_user:'یوزرنیم کانال',
  sup:'حمایت از ما',sup_d:'وقتی کاربر در ربات 💝 حمایت از ما را می‌زند نشان داده می‌شود. اگر هر دو فیلد خالی باشند، ربات به کاربران می‌گوید حمایت هنوز تنظیم نشده.',sup_text:'پیام (HTML مجاز، مثلاً آدرس کیف پول داخل <code>)',sup_links:'دکمه‌های لینک، هر خط یکی: عنوان | https://url',
  bc:'پیام همگانی',bc_d:'به همهٔ کسانی که از ربات استفاده کرده‌اند پیام بفرست. HTML مجاز است. در پس‌زمینه ارسال می‌شود.',bc_send:'ارسال به همه',
@@ -862,7 +882,7 @@ function renderGuide(){var g=GUIDE[lang]||GUIDE.en;$('guidebox').innerHTML=g.map
 function nav(btn){cur=btn.dataset.p;document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('on'));btn.classList.add('on');
  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.dataset.pane===cur));
  $('ptitle').textContent=T('ptitle_'+cur);$('psub').textContent=T('psub_'+cur);$('app').classList.remove('open');
- if(cur==='stats')loadStats();if(cur==='inbox')loadInbox();if(cur==='faq')loadFaq();if(cur==='sections')loadSections();if(cur==='users')loadUsers();if(cur==='settings')loadConfig();if(cur==='guide')renderGuide()}
+ if(cur==='stats')loadStats();if(cur==='inbox')loadInbox();if(cur==='faq')loadFaq();if(cur==='sections')loadSections();if(cur==='users')loadUsers();if(cur==='settings'){loadConfig();loadOffenders()}if(cur==='guide')renderGuide()}
 
 $('lg').onclick=function(e){var b=e.target.closest('button');if(b){lang=b.dataset.l;localStorage.setItem('nova-lang',lang);applyLang()}};
 $('theme').onclick=function(){theme=theme==='dark'?'light':'dark';localStorage.setItem('nova-theme',theme);applyTheme()};
@@ -933,9 +953,13 @@ function qrowHTML(r){
    T('qa_draft')+(unsure?' <span class="warn">'+T('qa_unsure')+'</span>':'')+'</span>'+esc(r.draft)+'</div>':'';
  var send='<button class="btn'+(unsure?' ghost':'')+' sm" onclick="qaApprove('+(+r.id)+')">'+T('qa_send_draft')+'</button>';
  var edit='<button class="btn'+(unsure?'':' ghost')+' sm" onclick="qaReply('+(+r.id)+')">'+T('qa_edit_send')+'</button>';
+ // Block the sender straight from their message. Bans the user (bot stops
+ // taking their messages) and drops their questions from the feed. Reversible
+ // from the Users pane. Only shown when we know the sender's id.
+ var blk=r.user_id?'<button class="btn dg sm" onclick="qaBlock('+(+r.user_id)+')">'+T('u_block')+'</button>':'';
  var btns=hasDraft
-  ?'<div class="btncol">'+(unsure?edit+send:send+edit)+'</div>'
-  :'<div class="btncol"><button class="btn ghost sm" onclick="qaReply('+(+r.id)+')">'+IC.reply+T('qa_reply')+'</button></div>';
+  ?'<div class="btncol">'+(unsure?edit+send:send+edit)+blk+'</div>'
+  :'<div class="btncol"><button class="btn ghost sm" onclick="qaReply('+(+r.id)+')">'+IC.reply+T('qa_reply')+'</button>'+blk+'</div>';
  return '<div class="qrow"><span class="chip '+st.c+'"><span class="dot"></span>'+T(st.k)+'</span>'+
   '<div class="body"><div class="qt" dir="auto">'+esc(q)+'</div>'+draft+
   '<div class="meta"><span>'+esc(String(r.lang||'').toUpperCase())+'</span><span>'+rel(r.created_at)+'</span></div></div>'+
@@ -1012,6 +1036,17 @@ function goSettings(){
 
 // After answering, refresh whichever list the click came from so the row clears.
 function refreshQa(){if(cur==='inbox')loadInbox();else loadStats()}
+
+// Block the sender of a support message (from the Reply/Waiting feeds). Same
+// banned state the Telegram block button and the Users pane use, so it stays in
+// sync everywhere; then refresh so the blocked user's messages drop off the feed.
+async function qaBlock(uid){
+ if(!uid)return;
+ if(!confirm(T('u_block')+'?'))return;
+ await api('POST','users',{id:+uid,banned:true});
+ toast(T('saved'));
+ refreshQa();
+}
 
 // Answer a support question from the panel. The reply is delivered to the
 // user in Telegram and saved as the human answer, which the AI learns from.
@@ -1091,7 +1126,9 @@ async function loadConfig(){var c=await api('GET','config');welcome_en.value=c.w
  support_text.value=c.support_text||'';support_links.value=c.support_links||'';
  ai_enabled.checked=c.ai_enabled!=='0';ai_model.value=c.ai_model||'claude-opus-4-8';
  ((c.ai_mode||'draft')==='auto'?ai_mode_auto:ai_mode_draft).checked=true;
- community_group_id.value=c.community_group_id||'';community_gate.checked=c.community_gate!=='0';community_cleanup.checked=c.community_cleanup==='1'}
+ community_group_id.value=c.community_group_id||'';community_gate.checked=c.community_gate!=='0';community_cleanup.checked=c.community_cleanup==='1';
+ profanity_on.checked=c.profanity_on==='1';profanity_words.value=c.profanity_words||'';
+ profanity_mute.value=c.profanity_mute||'3';profanity_ban.value=c.profanity_ban||'5';profanity_mute_min.value=c.profanity_mute_min||'60'}
 async function saveConfig(){await api('POST','config',{welcome_en:welcome_en.value,welcome_fa:welcome_fa.value,
  welcome_image:welcome_image.value.trim(),
  contact_group_id:contact_group_id.value.trim(),contact_enabled:contact_enabled.checked?'1':'0',faq_enabled:faq_enabled.checked?'1':'0',
@@ -1099,7 +1136,28 @@ async function saveConfig(){await api('POST','config',{welcome_en:welcome_en.val
  support_text:support_text.value,support_links:support_links.value,
  ai_enabled:ai_enabled.checked?'1':'0',ai_mode:ai_mode_auto.checked?'auto':'draft',
  ai_model:ai_model.value.trim()||'claude-opus-4-8',
- community_group_id:community_group_id.value.trim(),community_gate:community_gate.checked?'1':'0',community_cleanup:community_cleanup.checked?'1':'0'});toast(T('saved'))}
+ community_group_id:community_group_id.value.trim(),community_gate:community_gate.checked?'1':'0',community_cleanup:community_cleanup.checked?'1':'0',
+ profanity_on:profanity_on.checked?'1':'0',profanity_words:profanity_words.value,
+ profanity_mute:String(+profanity_mute.value||3),profanity_ban:String(+profanity_ban.value||5),profanity_mute_min:String(+profanity_mute_min.value||60)});toast(T('saved'))}
+
+// Members the profanity filter has flagged. Untrusted user text (name, snippet)
+// is escaped with esc() before it touches innerHTML.
+async function loadOffenders(){var el=$('offlist');if(!el)return;
+ var list=await api('GET','offenders').catch(function(){return[]});window._off=list;
+ if(!list||!list.length){el.innerHTML=emptyBox('fl_none');return}
+ el.innerHTML=list.map(function(o){
+  var name=esc(o.first_name||'')+(o.username?' <span class="un" dir="ltr">@'+esc(o.username)+'</span>':'');
+  var st=o.status==='banned'?{c:'err',k:'fl_banned'}:o.status==='muted'?{c:'warn',k:'fl_muted'}:{c:'ok',k:'fl_active'};
+  var acts='<button class="btn ghost sm" onclick="offAction('+o.user_id+',\\'reset\\')">'+T('fl_reset')+'</button>';
+  if(o.status==='muted')acts+='<button class="btn ghost sm" onclick="offAction('+o.user_id+',\\'unmute\\')">'+T('fl_unmute')+'</button>';
+  if(o.status==='banned')acts+='<button class="btn ghost sm" onclick="offAction('+o.user_id+',\\'unban\\')">'+T('fl_unban')+'</button>';
+  return '<div class="item"><div class="item-h"><div class="q" dir="auto">'+(name||'#')+'</div>'+
+   '<span class="chip info"><span class="dot"></span>'+nf(o.count||0)+' '+T('fl_strikes')+'</span>'+
+   '<span class="chip '+st.c+'"><span class="dot"></span>'+T(st.k)+'</span></div>'+
+   (o.last_text?'<div class="a" dir="auto">'+esc(o.last_text)+'</div>':'')+
+   '<div class="meta"><code>'+esc(o.user_id)+'</code>'+(o.last_at?'<span dir="ltr">'+rel(o.last_at)+'</span>':'')+'</div>'+
+   '<div class="acts">'+acts+'</div></div>'}).join('')}
+async function offAction(uid,action){await api('POST','offender-action',{user_id:+uid,action:action});toast(T('saved'));loadOffenders()}
 
 async function broadcast(){var t=bc.value.trim();if(!t)return toast(T('fill'));if(!confirm(T('confirm_bc')))return;
  var r=await api('POST','broadcast',{text:t});if(r.ok){toast(T('sending')+' '+r.recipients);bc.value=''}else toast('Error')}
