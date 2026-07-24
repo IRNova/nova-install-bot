@@ -117,7 +117,7 @@ export async function setQaAnswer(env, qaId, answer, source) {
 // Record an admin's group reply as the (human) answer to the question the
 // card carries. A human answer always wins over an earlier AI answer.
 // source defaults to 'human' (a real answer the KB should learn from). Pass
-// 'photo' for a captionless image reply: it clears the question from the
+// 'media' for a captionless attachment reply: it clears the question from the
 // Waiting inbox but stays out of the knowledge pack, which only pulls
 // human/approved answers.
 export async function setQaAnswerByCard(env, cardMsgId, answer, source = "human") {
@@ -211,12 +211,16 @@ export async function listAnsweredQa(env, { sources = null, limit = 40 } = {}) {
 // inbox. Unlike the Overview feed (last 8, any status) this is the full backlog
 // the team still has to clear. Question text is untrusted; the panel escapes it.
 export async function listWaitingQa(env, { limit = 200 } = {}) {
+  // Blocked (banned) users are excluded: once you block someone, their pending
+  // questions leave the inbox so the queue matches who you actually answer.
   const { results } = await env.DB.prepare(
-    "SELECT id, question, lang, draft, draft_sure, created_at FROM qa_log " +
-    "WHERE answer IS NULL OR answer = '' ORDER BY id DESC LIMIT ?"
+    "SELECT q.id, q.user_id, q.question, q.lang, q.draft, q.draft_sure, q.created_at FROM qa_log q " +
+    "LEFT JOIN users u ON u.id = q.user_id " +
+    "WHERE (q.answer IS NULL OR q.answer = '') AND COALESCE(u.banned, 0) = 0 ORDER BY q.id DESC LIMIT ?"
   ).bind(limit).all().catch(() => ({ results: [] }));
   return (results || []).map((r) => ({
     id: r.id,
+    user_id: r.user_id,
     question: String(r.question || "").slice(0, 2000),
     lang: r.lang || "en",
     status: "waiting",
@@ -257,12 +261,15 @@ export async function overview(env) {
   // Latest support questions, newest first. Questions are untrusted user text;
   // ship a trimmed snippet only, the panel escapes it before rendering.
   const { results: recentRows } = await env.DB.prepare(
-    "SELECT id, question, answer, lang, source, draft, draft_sure, created_at FROM qa_log ORDER BY id DESC LIMIT 8"
+    "SELECT q.id, q.user_id, q.question, q.answer, q.lang, q.source, q.draft, q.draft_sure, q.created_at FROM qa_log q " +
+    "LEFT JOIN users u ON u.id = q.user_id " +
+    "WHERE COALESCE(u.banned, 0) = 0 ORDER BY q.id DESC LIMIT 8"
   ).all().catch(() => ({ results: [] }));
   const recent = (recentRows || []).map((r) => {
     const answered = !!(r.answer && r.answer !== "");
     return {
       id: r.id,
+      user_id: r.user_id,
       question: String(r.question || "").slice(0, 200),
       lang: r.lang || "en",
       status: !answered ? "waiting" : r.source === "ai" ? "ai" : "human",
@@ -294,4 +301,47 @@ export async function stats(env) {
     users: users.n, active7d: active.n, installs: installs.n, builders: builders.n, banned: banned.n,
     questions: qa.n, aiAnswered: ai.n,
   };
+}
+
+// --- Profanity moderation: community-group strike tracking ---
+
+// Record one profanity strike for a member and return their new total. Upserts
+// so members who never DMed the bot (no `users` row) are still tracked.
+export async function bumpOffense(env, from, snippet) {
+  await env.DB.prepare(
+    "INSERT INTO group_offenders (user_id, first_name, username, count, last_text, last_at) " +
+    "VALUES (?, ?, ?, 1, ?, datetime('now')) " +
+    "ON CONFLICT(user_id) DO UPDATE SET count = count + 1, " +
+    "first_name = excluded.first_name, username = excluded.username, " +
+    "last_text = excluded.last_text, last_at = excluded.last_at"
+  ).bind(from.id, from.first_name || null, from.username || null,
+    String(snippet || "").slice(0, 200)).run().catch(() => {});
+  const row = await env.DB.prepare(
+    "SELECT count FROM group_offenders WHERE user_id = ?"
+  ).bind(from.id).first().catch(() => null);
+  return (row && row.count) || 1;
+}
+
+// Flag an offender's enforcement state for the admin panel.
+export async function setOffenderStatus(env, userId, status, mutedUntil = 0) {
+  await env.DB.prepare(
+    "INSERT INTO group_offenders (user_id, status, muted_until) VALUES (?, ?, ?) " +
+    "ON CONFLICT(user_id) DO UPDATE SET status = excluded.status, muted_until = excluded.muted_until"
+  ).bind(userId, status, mutedUntil || 0).run().catch(() => {});
+}
+
+// Everyone the profanity filter has flagged, newest strike first.
+export async function listOffenders(env, { limit = 200 } = {}) {
+  const { results } = await env.DB.prepare(
+    "SELECT user_id, first_name, username, count, last_text, last_at, muted_until, status " +
+    "FROM group_offenders ORDER BY last_at DESC LIMIT ?"
+  ).bind(limit).all().catch(() => ({ results: [] }));
+  return results || [];
+}
+
+// Clear a member's strike count (a fresh start after unmute/unban).
+export async function resetOffender(env, userId) {
+  await env.DB.prepare(
+    "UPDATE group_offenders SET count = 0, status = 'active', muted_until = 0 WHERE user_id = ?"
+  ).bind(userId).run().catch(() => {});
 }

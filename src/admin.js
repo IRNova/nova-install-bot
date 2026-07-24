@@ -2,7 +2,7 @@
 // All routes live under /admin. Auth = an HMAC-signed cookie keyed on ADMIN_PASSWORD.
 
 import { tg, send, esc } from "./telegram.js";
-import { getConfig, setConfig, listFaq, listSections, stats, overview, listWaitingQa, markBlocked, listUsers, setBanned, getQa, getUserLang, setQaAnswer, isBanned } from "./db.js";
+import { getConfig, setConfig, listFaq, listSections, stats, overview, listWaitingQa, markBlocked, listUsers, setBanned, getQa, getUserLang, setQaAnswer, isBanned, listOffenders, resetOffender, setOffenderStatus } from "./db.js";
 import { suggestFaqs, aiEnabled } from "./ai.js";
 import { contactKb } from "./bot.js";
 import { t } from "./i18n.js";
@@ -166,12 +166,43 @@ async function handleApi(request, env, ctx, res, method) {
     return json({ ok: true });
   }
 
+  // ── profanity offenders ──
+  // Everyone the community-group profanity filter has flagged, plus actions to
+  // reset a strike count, lift a mute, or reverse a ban (also restoring them in
+  // the Telegram group when we can).
+  if (res === "offenders" && method === "GET") {
+    return json(await listOffenders(env, { limit: 200 }));
+  }
+  if (res === "offender-action" && method === "POST") {
+    const id = Number(body.user_id);
+    const action = String(body.action || "");
+    if (!id) return json({ error: "bad id" }, 400);
+    const group = await getConfig(env, "community_group_id", "");
+    if (action === "unmute") {
+      if (group) await tg(env, "restrictChatMember", { chat_id: group, user_id: id, permissions: {
+        can_send_messages: true, can_send_media_messages: true, can_send_polls: true,
+        can_send_other_messages: true, can_add_web_page_previews: true, can_invite_users: true,
+      } }).catch(() => {});
+      await setOffenderStatus(env, id, "active", 0);
+    } else if (action === "unban") {
+      if (group) await tg(env, "unbanChatMember", { chat_id: group, user_id: id, only_if_banned: true }).catch(() => {});
+      await setBanned(env, id, false);
+      await resetOffender(env, id);
+    } else if (action === "reset") {
+      await resetOffender(env, id);
+    } else {
+      return json({ error: "bad action" }, 400);
+    }
+    return json({ ok: true });
+  }
+
   // ── config ──
   const CONFIG_KEYS = ["welcome", "welcome_en", "welcome_fa", "welcome_image",
     "contact_group_id", "contact_enabled", "faq_enabled",
     "join_required", "join_channel", "support_text", "support_links",
     "ai_enabled", "ai_mode", "ai_model", "ai_cf_model",
-    "community_group_id", "community_gate", "community_cleanup"];
+    "community_group_id", "community_gate", "community_cleanup",
+    "profanity_on", "profanity_words", "profanity_mute", "profanity_ban", "profanity_mute_min"];
   if (res === "config" && method === "GET") {
     const out = {};
     for (const k of CONFIG_KEYS) out[k] = await getConfig(env, k, "");

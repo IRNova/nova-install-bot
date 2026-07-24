@@ -7,7 +7,7 @@
 // Secrets (wrangler secret put, never committed):
 //   BOT_TOKEN, WEBHOOK_SECRET, ADMIN_PASSWORD
 
-import { handleUpdate, sweepCommunityGroup } from "./bot.js";
+import { handleUpdate, sweepCommunityGroup, syncBotProfile } from "./bot.js";
 import { handleAdmin } from "./admin.js";
 import { BANNER_JPEG_B64 } from "./banner.js";
 import { autoAnswer } from "./ai.js";
@@ -27,6 +27,15 @@ export default {
     const url = new URL(request.url);
 
     if (request.method === "GET" && url.pathname === "/") {
+      // One-off, idempotent trigger to push the bot's profile description (with
+      // the Farsi bidi fix) to Telegram. Safe to hit: it only re-applies the
+      // baked-in text, and skips the API call once the stored version matches.
+      if (url.searchParams.get("sync") === "profile") {
+        const r = await syncBotProfile(env, { force: url.searchParams.get("force") === "1" });
+        return new Response(JSON.stringify(r), {
+          headers: { "Content-Type": "application/json;charset=utf-8" },
+        });
+      }
       return new Response("Nova Install Bot is running.", { status: 200 });
     }
 

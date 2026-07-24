@@ -85,6 +85,21 @@ CREATE TABLE IF NOT EXISTS ai_usage (
   blocked INTEGER DEFAULT 0   -- calls refused because the allowance was spent
 );
 
+-- Profanity moderation: per-user strike count in the community group so
+-- enforcement can escalate (warn -> mute -> ban). Separate from `users`
+-- because community members may never have DMed the bot.
+CREATE TABLE IF NOT EXISTS group_offenders (
+  user_id     INTEGER PRIMARY KEY,
+  first_name  TEXT,
+  username    TEXT,
+  count       INTEGER DEFAULT 0,
+  last_text   TEXT,
+  last_at     TEXT,
+  muted_until INTEGER DEFAULT 0,
+  status      TEXT DEFAULT 'active'
+);
+CREATE INDEX IF NOT EXISTS idx_offenders_last ON group_offenders(last_at DESC);
+
 -- Seed default config.
 INSERT OR IGNORE INTO config (key, value) VALUES
   ('welcome', ''),
