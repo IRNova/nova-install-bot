@@ -70,7 +70,12 @@ export default {
     }
 
     if (request.method === "POST" && url.pathname === "/webhook") {
-      if (env.WEBHOOK_SECRET &&
+      // Fail closed: require WEBHOOK_SECRET and an exact header match. If the secret
+      // is unset the webhook is unauthenticated and anyone could POST a forged Telegram
+      // update (spoofing chat/user ids to ban users, approve AI answers, etc.), so we
+      // reject rather than process. Register the webhook with this same secret_token:
+      //   setWebhook(url=.../webhook, secret_token=<WEBHOOK_SECRET>)
+      if (!env.WEBHOOK_SECRET ||
           request.headers.get("X-Telegram-Bot-Api-Secret-Token") !== env.WEBHOOK_SECRET) {
         return new Response("forbidden", { status: 403 });
       }
