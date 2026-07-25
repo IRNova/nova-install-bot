@@ -26,6 +26,11 @@ async function makeToken(env) {
 }
 
 async function validToken(env, token) {
+  // Fail closed when no admin password is configured. Otherwise the cookie would
+  // be signed with the constant fallback key ("unset"), which anyone reading this
+  // (now-public) code could use to forge a valid session. No password set = no
+  // admin access, full stop.
+  if (!env.ADMIN_PASSWORD) return false;
   if (!token) return false;
   const [ts, sig] = token.split(".");
   if (!ts || !sig) return false;
