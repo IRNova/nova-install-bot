@@ -12,6 +12,17 @@ import { handleAdmin } from "./admin.js";
 import { BANNER_JPEG_B64 } from "./banner.js";
 import { autoAnswer } from "./ai.js";
 
+// Constant-time string compare, so matching a secret doesn't leak its length/prefix
+// through response timing. Length mismatch still returns false, but without an early
+// character-by-character bail.
+function timingSafeEqual(a, b) {
+  a = String(a); b = String(b);
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 let bannerBytes = null;
 function getBanner() {
   if (!bannerBytes) {
@@ -67,6 +78,33 @@ export default {
 
     if (url.pathname === "/admin" || url.pathname.startsWith("/admin/")) {
       return handleAdmin(request, env, ctx, url);
+    }
+
+    // Re-register this bot's Telegram webhook with the current WEBHOOK_SECRET, using the
+    // BOT_TOKEN the worker already holds. Guarded by the secret itself (constant-time
+    // compare), so only someone who already knows WEBHOOK_SECRET can call it. It can only
+    // point the webhook at this worker's own /webhook and always uses env.WEBHOOK_SECRET as
+    // the secret_token, so it cannot redirect updates elsewhere or expose the token. It
+    // preserves the existing allowed_updates so delivery behavior does not change.
+    if (request.method === "POST" && url.pathname === "/setup/register-webhook") {
+      const key = request.headers.get("X-Setup-Key") || "";
+      if (!env.WEBHOOK_SECRET || !env.BOT_TOKEN || !timingSafeEqual(key, env.WEBHOOK_SECRET)) {
+        return new Response("forbidden", { status: 403 });
+      }
+      const api = `https://api.telegram.org/bot${env.BOT_TOKEN}`;
+      let allowed;
+      try {
+        const info = await (await fetch(`${api}/getWebhookInfo`)).json();
+        allowed = info && info.result && info.result.allowed_updates;
+      } catch (e) {}
+      const body = { url: `${url.origin}/webhook`, secret_token: env.WEBHOOK_SECRET };
+      if (Array.isArray(allowed) && allowed.length) body.allowed_updates = allowed;
+      const r = await fetch(`${api}/setWebhook`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      return new Response(await r.text(), { status: r.ok ? 200 : 502, headers: { "Content-Type": "application/json" } });
     }
 
     if (request.method === "POST" && url.pathname === "/webhook") {
