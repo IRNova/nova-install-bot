@@ -114,7 +114,7 @@ export default {
       // reject rather than process. Register the webhook with this same secret_token:
       //   setWebhook(url=.../webhook, secret_token=<WEBHOOK_SECRET>)
       if (!env.WEBHOOK_SECRET ||
-          request.headers.get("X-Telegram-Bot-Api-Secret-Token") !== env.WEBHOOK_SECRET) {
+          !timingSafeEqual(request.headers.get("X-Telegram-Bot-Api-Secret-Token") || "", env.WEBHOOK_SECRET)) {
         return new Response("forbidden", { status: 403 });
       }
       let update;

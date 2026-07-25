@@ -12,6 +12,16 @@ const COOKIE = "nova_admin";
 
 // ── crypto: sign / verify the session cookie ────────────────────────────────
 
+// Constant-time string compare so checking the admin password doesn't leak its
+// length/prefix through response timing.
+function timingSafeEqual(a, b) {
+  a = String(a); b = String(b);
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 async function hmac(env, data) {
   const key = await crypto.subtle.importKey(
     "raw", new TextEncoder().encode(env.ADMIN_PASSWORD || "unset"),
@@ -61,7 +71,7 @@ export async function handleAdmin(request, env, ctx, url) {
   if (path === "/admin/login" && method === "POST") {
     const form = await request.formData();
     const pw = form.get("password") || "";
-    if (!env.ADMIN_PASSWORD || pw !== env.ADMIN_PASSWORD) {
+    if (!env.ADMIN_PASSWORD || !timingSafeEqual(pw, env.ADMIN_PASSWORD)) {
       return new Response(LOGIN_HTML(true), { status: 401, headers: { "Content-Type": "text/html" } });
     }
     const token = await makeToken(env);
