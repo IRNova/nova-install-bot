@@ -9,7 +9,7 @@ import {
   bumpOffense, setOffenderStatus,
 } from "./db.js";
 import { aiEnabled, autoAnswer } from "./ai.js";
-import { install, TOKEN_DEEPLINK, extractToken } from "./install.js";
+import { install, TOKEN_DEEPLINK, UPDATE_TOKEN_DEEPLINK, extractToken } from "./install.js";
 import { startUpdate, runUpdate, loadUpdCtx, clearUpdCtx } from "./update.js";
 import { t, normLang } from "./i18n.js";
 import { gatherUserCard } from "./userinfo.js";
@@ -128,7 +128,20 @@ export async function handleUpdate(update, env) {
   }
 
   switch (cmd) {
-    case "/start":
+    case "/start": {
+      const startPayload = (text.split(/\s+/)[1] || "").toLowerCase();
+      if (startPayload === "update") {
+        await setConfig(env, `await_utoken_${from.id}`, "1");
+        await setConfig(env, `await_token_${from.id}`, "");
+        return send(env, chatId, t(lang, "upd_text"), { reply_markup: updateKeyboard(lang) });
+      }
+      if (startPayload === "install" || startPayload === "setup") {
+        await setConfig(env, `await_token_${from.id}`, "1");
+        await setConfig(env, `await_utoken_${from.id}`, "");
+        return send(env, chatId, t(lang, "install_text"), { reply_markup: installKeyboard(lang, true) });
+      }
+      return sendMenu(env, chatId, from, lang);
+    }
     case "/menu":
     case "/help":
       return sendMenu(env, chatId, from, lang);
@@ -416,7 +429,9 @@ async function handleCallback(cb, env) {
       return edit(env, chatId, msgId, t(lang, "upd_expired"),
         { reply_markup: { inline_keyboard: [backRow(lang)] } });
     }
-    return edit(env, chatId, msgId, t(lang, "upd_confirm", ctx.w[i]), {
+    const chosen = ctx.w[i];
+    const label = chosen.c ? `${chosen.n} · ${chosen.c}` : chosen.n;
+    return edit(env, chatId, msgId, t(lang, "upd_confirm", esc(label)), {
       reply_markup: { inline_keyboard: [
         [{ text: t(lang, "btn_upd_go"), callback_data: `updg:${i}`, style: "success" }],
         [{ text: t(lang, "btn_upd_cancel"), callback_data: "updx" }],
@@ -460,7 +475,7 @@ function installKeyboard(lang, withBack) {
 
 function updateKeyboard(lang) {
   return { inline_keyboard: [
-    [{ text: t(lang, "btn_get_token"), url: TOKEN_DEEPLINK, style: "primary" }],
+    [{ text: t(lang, "btn_get_token"), url: UPDATE_TOKEN_DEEPLINK, style: "primary" }],
     backRow(lang),
   ] };
 }
