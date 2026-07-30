@@ -36,7 +36,9 @@ export function extractToken(text) {
 export async function cf(method, path, token, body, ctype) {
   const headers = { Authorization: `Bearer ${token}` };
   if (ctype) headers["Content-Type"] = ctype;
-  const r = await fetch(CF + path, { method, headers, body, redirect: "error" });
+  // Cloudflare Workers implements "follow" and "manual"; browser-only "error"
+  // throws before the request is sent.
+  const r = await fetch(CF + path, { method, headers, body, redirect: "manual" });
   const txt = await r.text();
   let json = null;
   try { json = JSON.parse(txt); } catch {}
@@ -96,7 +98,7 @@ export async function downloadWorkerCode(env) {
   let last = "no source configured";
   for (const url of urls) {
     try {
-      const r = await fetch(url, { redirect: "error", cf: { cacheTtl: 0 } });
+      const r = await fetch(url, { redirect: "manual", cf: { cacheTtl: 0 } });
       if (!r.ok) {
         last = `HTTP ${r.status}`;
         continue;

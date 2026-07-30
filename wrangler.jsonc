@@ -11,6 +11,11 @@
   "main": "src/index.js",
   "compatibility_date": "2026-07-30",
   "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": true,
+  "routes": [
+    { "pattern": "bot.novaproxy.online", "custom_domain": true }
+  ],
   "observability": { "enabled": true },
   // Nightly community-group cleanup. 20:30 UTC = 00:00 in Iran (a fixed UTC+3:30,
   // no daylight saving since 2022).
@@ -19,15 +24,16 @@
     // Public config — safe to commit. The worker.js the bot installs on the
     // user's account, and the pre-filled Cloudflare token page.
     "WORKER_JS_URL": "https://raw.githubusercontent.com/IRNova/Nova-Proxy/main/worker.js",
-    "WORKER_JS_FALLBACK_URL": "https://raw.githubusercontent.com/IRNova/Nova-Proxy/eecb3bbb8a9902894227459a5bda92f73faf5eda/worker.js"
+    "WORKER_JS_FALLBACK_URL": "https://raw.githubusercontent.com/IRNova/Nova-Proxy/a926e56e56c8db378f4b613ab9a7272237ff19d2/worker.js",
+    "PUBLIC_URL": "https://bot.novaproxy.online"
   },
   // Workers AI: free auto-answer fallback (10,000 neurons/day included).
   "ai": { "binding": "AI" },
   "d1_databases": [
     {
       "binding": "DB",
-      "database_name": "nova-bot-db",
-      "database_id": "8532659b-ef4b-43f7-879b-f3a00477801c"
+      "database_name": "nova-install-bot-db",
+      "database_id": "63fb0024-a067-47b5-89f2-6d4eff07ed2f"
     }
   ]
 }

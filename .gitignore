@@ -3,5 +3,6 @@ node_modules/
 .wrangler/
 .DS_Store
 *.log
+*.cpuprofile
 .env
 .webhook_secret

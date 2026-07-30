@@ -100,6 +100,12 @@ export default {
       } catch (e) {}
       const body = { url: `${url.origin}/webhook`, secret_token: env.WEBHOOK_SECRET };
       if (Array.isArray(allowed) && allowed.length) body.allowed_updates = allowed;
+      // During a recovery or migration Telegram may have accumulated a large backlog.
+      // Dropping it is deliberately opt-in so normal webhook re-registration never loses
+      // messages, while an operator can prevent a stale replay from overwhelming D1.
+      if (url.searchParams.get("drop_pending_updates") === "true") {
+        body.drop_pending_updates = true;
+      }
       const r = await fetch(`${api}/setWebhook`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },

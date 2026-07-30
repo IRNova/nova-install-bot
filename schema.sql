@@ -124,7 +124,7 @@ INSERT OR IGNORE INTO config (key, value) VALUES
   ('join_channel', 'irnova_proxy'),
   ('support_text', ''),
   ('support_links', ''),
-  ('welcome_image', 'https://nova-install-bot.bitter-flower-1b15.workers.dev/banner.jpg'),
+  ('welcome_image', ''),
   ('ai_enabled', '1'),
   ('ai_mode', 'draft'),
   ('ai_model', 'claude-opus-4-8'),
