@@ -4,6 +4,7 @@ import { webcrypto } from "node:crypto";
 import {
   startUpdate, loadUpdCtx, runUpdate,
 } from "../src/update.js";
+import { cf, downloadWorkerCode } from "../src/install.js";
 
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
 
@@ -95,6 +96,29 @@ test("update token is encrypted and bindings are inherited", async () => {
     assert.match(uploaded, /"type":"inherit","name":"DB"/);
     assert.match(uploaded, /"type":"inherit","name":"KV"/);
     assert.equal(uploaded.includes(token), false);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
+
+test("installer uses a redirect mode supported by Cloudflare Workers", async () => {
+  const originalFetch = globalThis.fetch;
+  const redirects = [];
+  globalThis.fetch = async (url, init = {}) => {
+    redirects.push(init.redirect);
+    if (String(url).startsWith("https://api.cloudflare.com/")) {
+      return json({ status: "active" });
+    }
+    const markers =
+      "const Version = 'test';const NOVA_BUILD='test';" +
+      "const NOVA_TG_CHANNEL='test';export default {};";
+    return new Response(markers + "x".repeat(100_000));
+  };
+
+  try {
+    await cf("GET", "/user/tokens/verify", "test-token");
+    await downloadWorkerCode({ WORKER_JS_URL: "https://example.com/worker.js" });
+    assert.deepEqual(redirects, ["manual", "manual"]);
   } finally {
     globalThis.fetch = originalFetch;
   }

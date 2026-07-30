@@ -1,6 +1,6 @@
 {
   "name": "nova-install-bot",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "private": true,
   "type": "module",
   "description": "Telegram bot that installs the Nova panel on a user's own Cloudflare account.",
@@ -11,7 +11,7 @@
     "test": "node --test"
   },
   "devDependencies": {
-    "wrangler": "^4.110.0"
+    "wrangler": "^4.116.0"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.111.0"
