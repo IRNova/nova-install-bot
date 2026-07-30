@@ -1,14 +1,17 @@
 // The Cloudflare install sequence: verify token → account → subdomain → D1 →
-// KV → fetch worker.js → deploy → enable → poll. Mirrors novaproxy.online/install.
+// KV → fetch worker.js → deploy → enable → poll. Linked from the credential-free
+// guidance at novaproxy.online/setup/.
 
-import { send, edit } from "./telegram.js";
+import { send, edit, esc } from "./telegram.js";
 import { bumpInstalls } from "./db.js";
 import { t } from "./i18n.js";
 
 const CF = "https://api.cloudflare.com/client/v4";
 
 export const TOKEN_DEEPLINK =
-  "https://dash.cloudflare.com/profile/api-tokens?permissionGroupKeys=%5B%7B%22key%22%3A%22workers_scripts%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22workers_kv_storage%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22d1%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22account_settings%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22account_analytics%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22zone%22%2C%22type%22%3A%22read%22%7D%2C%7B%22key%22%3A%22dns%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22ssl_and_certificates%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22zone_settings%22%2C%22type%22%3A%22edit%22%7D%5D&accountId=*&zoneId=all&name=Nova%20Installer";
+  "https://dash.cloudflare.com/profile/api-tokens?permissionGroupKeys=%5B%7B%22key%22%3A%22workers_scripts%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22workers_kv_storage%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22d1%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22account_settings%22%2C%22type%22%3A%22read%22%7D%5D&accountId=*&zoneId=all&name=Nova%20Installer";
+export const UPDATE_TOKEN_DEEPLINK =
+  "https://dash.cloudflare.com/profile/api-tokens?permissionGroupKeys=%5B%7B%22key%22%3A%22workers_scripts%22%2C%22type%22%3A%22edit%22%7D%2C%7B%22key%22%3A%22account_settings%22%2C%22type%22%3A%22read%22%7D%5D&accountId=*&zoneId=all&name=Nova%20One-Time%20Updater";
 
 // Cloudflare API tokens come in two shapes:
 //   • legacy: a 40-character [A-Za-z0-9_-] string
@@ -33,7 +36,7 @@ export function extractToken(text) {
 export async function cf(method, path, token, body, ctype) {
   const headers = { Authorization: `Bearer ${token}` };
   if (ctype) headers["Content-Type"] = ctype;
-  const r = await fetch(CF + path, { method, headers, body });
+  const r = await fetch(CF + path, { method, headers, body, redirect: "error" });
   const txt = await r.text();
   let json = null;
   try { json = JSON.parse(txt); } catch {}
@@ -65,22 +68,71 @@ export function cfErr(res) {
   return `HTTP ${res.status}`;
 }
 
-export const rand = (n = 6) =>
-  Array.from({ length: n }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join("");
+export function rand(n = 6) {
+  const bytes = crypto.getRandomValues(new Uint8Array(n));
+  return Array.from(bytes, (b) => "0123456789abcdef"[b & 15]).join("");
+}
 
 function rname() {
   const A = ["sunny", "swift", "atlas", "orbit", "pixel", "falcon", "crystal", "mango",
     "coral", "luna", "pearl", "turbo", "river", "comet"];
   const B = ["panel", "bridge", "node", "core", "wave", "gate", "stack", "vault",
     "portal", "cloud", "garden", "spark"];
-  const p = (a) => a[Math.floor(Math.random() * a.length)];
+  const p = (a) => a[crypto.getRandomValues(new Uint32Array(1))[0] % a.length];
   return `${p(A)}-${p(B)}-${rand(4)}`;
 }
 
-const STEP_KEYS = ["verify", "account", "sub", "db", "kv", "fetch", "deploy", "enable", "online"];
+export function validWorkerCode(code) {
+  return typeof code === "string" &&
+    code.length >= 100_000 &&
+    code.includes("export default") &&
+    code.includes("const Version =") &&
+    code.includes("NOVA_BUILD") &&
+    code.includes("NOVA_TG_CHANNEL");
+}
+
+export async function downloadWorkerCode(env) {
+  const urls = [env.WORKER_JS_URL, env.WORKER_JS_FALLBACK_URL].filter(Boolean);
+  let last = "no source configured";
+  for (const url of urls) {
+    try {
+      const r = await fetch(url, { redirect: "error", cf: { cacheTtl: 0 } });
+      if (!r.ok) {
+        last = `HTTP ${r.status}`;
+        continue;
+      }
+      const code = await r.text();
+      if (validWorkerCode(code)) return code;
+      last = "source failed Nova integrity checks";
+    } catch (e) {
+      last = (e && e.message) || String(e);
+    }
+  }
+  throw new Error(`Could not download a verified Nova worker (${last}).`);
+}
+
+export function workerUpload(code, metadata, prefix = "nova") {
+  const boundary = `----${prefix}${rand(12)}`;
+  const pre =
+    `--${boundary}\r\nContent-Disposition: form-data; name="metadata"\r\n` +
+    `Content-Type: application/json\r\n\r\n${JSON.stringify(metadata)}\r\n` +
+    `--${boundary}\r\nContent-Disposition: form-data; name="worker.js"; filename="worker.js"\r\n` +
+    `Content-Type: application/javascript+module\r\n\r\n`;
+  const post = `\r\n--${boundary}--\r\n`;
+  return {
+    body: new Blob([pre, code, post]),
+    contentType: `multipart/form-data; boundary=${boundary}`,
+  };
+}
+
+const STEP_KEYS = ["verify", "account", "fetch", "sub", "db", "kv", "deploy", "enable", "online"];
 
 export async function install(env, chatId, token, userId, lang = "en") {
   const state = {};
+  let accountId = "";
+  let dbId = "";
+  let kvId = "";
+  let workerCreated = false;
   const render = () =>
     t(lang, "building") + "\n\n" +
     STEP_KEYS.map((k) => {
@@ -96,7 +148,18 @@ export async function install(env, chatId, token, userId, lang = "en") {
   const bail = async (k, message) => {
     state[k] = "err";
     await paint();
-    await send(env, chatId, `❌ ${message}`);
+    await send(env, chatId, `❌ ${esc(message)}`);
+  };
+  const rollbackStorage = async () => {
+    if (!accountId || workerCreated) return;
+    if (kvId) {
+      await cf("DELETE", `/accounts/${accountId}/storage/kv/namespaces/${kvId}`, token).catch(() => {});
+      kvId = "";
+    }
+    if (dbId) {
+      await cf("DELETE", `/accounts/${accountId}/d1/database/${dbId}`, token).catch(() => {});
+      dbId = "";
+    }
   };
 
   try {
@@ -111,8 +174,19 @@ export async function install(env, chatId, token, userId, lang = "en") {
     await set("account", "run");
     const acc = await cf("GET", "/accounts?per_page=50", token);
     if (!cfOk(acc) || !acc.json.result || !acc.json.result.length) return bail("account", cfErr(acc));
-    const accountId = acc.json.result[0].id;
+    accountId = acc.json.result[0].id;
     await set("account", "done");
+
+    // Validate the exact artifact before creating any billable/persistent
+    // resources. A broken GitHub branch can never strand a D1/KV namespace.
+    await set("fetch", "run");
+    let workerCode;
+    try {
+      workerCode = await downloadWorkerCode(env);
+    } catch (e) {
+      return bail("fetch", (e && e.message) || "Could not download a verified Nova worker.");
+    }
+    await set("fetch", "done");
 
     await set("sub", "run");
     let subName = "";
@@ -129,12 +203,11 @@ export async function install(env, chatId, token, userId, lang = "en") {
     await set("db", "run");
     const dbRes = await cf("POST", `/accounts/${accountId}/d1/database`, token,
       JSON.stringify({ name: "nova-" + rand(6) + "-db" }), "application/json");
-    const dbId = dbRes.json && dbRes.json.result && dbRes.json.result.uuid;
+    dbId = dbRes.json && dbRes.json.result && dbRes.json.result.uuid;
     if (!dbId) return bail("db", cfErr(dbRes));
     await set("db", "done");
 
     await set("kv", "run");
-    let kvId = "";
     try {
       const kvRes = await cf("POST", `/accounts/${accountId}/storage/kv/namespaces`, token,
         JSON.stringify({ title: "nova-" + rand(6) + "-kv" }), "application/json");
@@ -142,43 +215,32 @@ export async function install(env, chatId, token, userId, lang = "en") {
     } catch {}
     await set("kv", "done");
 
-    await set("fetch", "run");
-    const wjResp = await fetch(env.WORKER_JS_URL);
-    if (!wjResp.ok) return bail("fetch", `Could not download worker.js (HTTP ${wjResp.status}).`);
-    const workerCode = await wjResp.text();
-    if (!workerCode || workerCode.length < 1000 || workerCode.indexOf("export default") < 0) {
-      return bail("fetch", "Downloaded worker.js looks invalid.");
-    }
-    await set("fetch", "done");
-
     await set("deploy", "run");
     const workerName = "nova-" + rname();
     const bindings = [{ type: "d1", name: "DB", id: dbId }];
     if (kvId) bindings.unshift({ type: "kv_namespace", name: "KV", namespace_id: kvId });
     const metadata = {
       main_module: "worker.js",
-      compatibility_date: "2024-09-23",
+      compatibility_date: "2026-07-30",
       compatibility_flags: ["nodejs_compat", "global_fetch_strictly_public"],
       bindings,
     };
-    const boundary = "----nova" + rand(12);
-    const pre =
-      `--${boundary}\r\nContent-Disposition: form-data; name="metadata"\r\n` +
-      `Content-Type: application/json\r\n\r\n${JSON.stringify(metadata)}\r\n` +
-      `--${boundary}\r\nContent-Disposition: form-data; name="worker.js"; filename="worker.js"\r\n` +
-      `Content-Type: application/javascript+module\r\n\r\n`;
-    const post = `\r\n--${boundary}--\r\n`;
-    const bodyBlob = new Blob([pre, workerCode, post]);
+    const upload = workerUpload(workerCode, metadata);
     const dep = await cf("PUT",
       `/accounts/${accountId}/workers/scripts/${encodeURIComponent(workerName)}`,
-      token, bodyBlob, `multipart/form-data; boundary=${boundary}`);
-    if (!cfOk(dep)) return bail("deploy", cfErr(dep));
+      token, upload.body, upload.contentType);
+    if (!cfOk(dep)) {
+      await rollbackStorage();
+      return bail("deploy", cfErr(dep));
+    }
+    workerCreated = true;
     await set("deploy", "done");
 
     await set("enable", "run");
-    await cf("POST",
+    const enabled = await cf("POST",
       `/accounts/${accountId}/workers/scripts/${encodeURIComponent(workerName)}/subdomain`,
       token, JSON.stringify({ enabled: true }), "application/json");
+    if (!cfOk(enabled)) return bail("enable", cfErr(enabled));
     await set("enable", "done");
 
     const panelUrl = `https://${workerName}.${subName}.workers.dev`;
@@ -190,7 +252,10 @@ export async function install(env, chatId, token, userId, lang = "en") {
     if (userId) await bumpInstalls(env, userId).catch(() => {});
     await sendResult(env, chatId, panelUrl, online, lang);
   } catch (e) {
-    await send(env, chatId, `❌ ${t(lang, "err_generic")}: <i>${(e && e.message) || "unknown error"}</i>`);
+    await rollbackStorage();
+    await send(env, chatId, `❌ ${t(lang, "err_generic")}: <i>${esc((e && e.message) || "unknown error")}</i>`);
+  } finally {
+    token = "";
   }
 }
 

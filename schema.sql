@@ -100,6 +100,20 @@ CREATE TABLE IF NOT EXISTS group_offenders (
 );
 CREATE INDEX IF NOT EXISTS idx_offenders_last ON group_offenders(last_at DESC);
 
+-- Short-lived update sessions. Cloudflare tokens are AES-GCM encrypted before
+-- storage and removed before upload, cancellation, or ten-minute expiry.
+CREATE TABLE IF NOT EXISTS update_sessions (
+  user_id       INTEGER PRIMARY KEY,
+  chat_id       INTEGER NOT NULL,
+  token_cipher  TEXT NOT NULL,
+  token_iv      TEXT NOT NULL,
+  workers_json  TEXT NOT NULL,
+  expires_at    INTEGER NOT NULL,
+  created_at    TEXT DEFAULT (datetime('now'))
+);
+CREATE INDEX IF NOT EXISTS idx_update_sessions_expires
+  ON update_sessions(expires_at);
+
 -- Seed default config.
 INSERT OR IGNORE INTO config (key, value) VALUES
   ('welcome', ''),

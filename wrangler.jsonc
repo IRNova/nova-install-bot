@@ -1,6 +1,7 @@
 {
   // Nova Install Bot — a Telegram bot that deploys the Nova panel to a user's
-  // own Cloudflare account, mirroring novaproxy.online/install.
+  // own Cloudflare account. The credential-free novaproxy.online/setup/ page
+  // links users here without collecting Cloudflare credentials on the website.
   //
   // Secrets (set with `wrangler secret put`, never committed):
   //   BOT_TOKEN       — the @BotFather token
@@ -8,7 +9,7 @@
   //                      can reject requests that aren't from Telegram
   "name": "nova-install-bot",
   "main": "src/index.js",
-  "compatibility_date": "2024-09-23",
+  "compatibility_date": "2026-07-30",
   "compatibility_flags": ["nodejs_compat"],
   "observability": { "enabled": true },
   // Nightly community-group cleanup. 20:30 UTC = 00:00 in Iran (a fixed UTC+3:30,
@@ -17,7 +18,8 @@
   "vars": {
     // Public config — safe to commit. The worker.js the bot installs on the
     // user's account, and the pre-filled Cloudflare token page.
-    "WORKER_JS_URL": "https://raw.githubusercontent.com/IRNova/Nova-Proxy/main/worker.js"
+    "WORKER_JS_URL": "https://raw.githubusercontent.com/IRNova/Nova-Proxy/main/worker.js",
+    "WORKER_JS_FALLBACK_URL": "https://raw.githubusercontent.com/IRNova/Nova-Proxy/eecb3bbb8a9902894227459a5bda92f73faf5eda/worker.js"
   },
   // Workers AI: free auto-answer fallback (10,000 neurons/day included).
   "ai": { "binding": "AI" },
