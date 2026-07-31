@@ -7,7 +7,7 @@
 
 import { send, edit, esc } from "./telegram.js";
 import {
-  cf, cfOk, cfErr, downloadWorkerCode, workerUpload,
+  adminUrl, cf, cfOk, cfErr, downloadWorkerCode, workerUpload,
 } from "./install.js";
 import { t } from "./i18n.js";
 
@@ -273,7 +273,7 @@ export async function runUpdate(env, chatId, msgId, userId, idx, lang) {
     const extra = worker.s ? {
       reply_markup: { inline_keyboard: [[{
         text: t(lang, "btn_open_panel"),
-        url: `https://${worker.n}.${worker.s}.workers.dev`,
+        url: adminUrl(`https://${worker.n}.${worker.s}.workers.dev`),
         style: "primary",
       }]] },
     } : {};

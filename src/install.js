@@ -62,6 +62,8 @@ export async function reportInstall(host) {
 }
 
 export const cfOk = (res) => !!(res.json && res.json.success === true);
+export const adminUrl = (url) => `${String(url).replace(/\/+$/, "")}/admin`;
+
 export function cfErr(res) {
   try {
     const e = res.json && res.json.errors && res.json.errors[0];
@@ -73,6 +75,38 @@ export function cfErr(res) {
 export function rand(n = 6) {
   const bytes = crypto.getRandomValues(new Uint8Array(n));
   return Array.from(bytes, (b) => "0123456789abcdef"[b & 15]).join("");
+}
+
+function b64url(bytes) {
+  let value = "";
+  for (const byte of bytes) value += String.fromCharCode(byte);
+  return btoa(value).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+// Each bot-created panel receives a secret, signed installation identity. The
+// value is stored as a Cloudflare secret binding, so it is not shown again in
+// the dashboard or normal settings responses. Updates inherit the binding.
+// This is a traceable deterrent, not DRM: the owner of a Worker can still
+// replace the code running in their own account.
+export async function createInstallationFingerprint(env, accountId, workerName, now = Date.now()) {
+  const signingSecret = String(env.INSTALLATION_SIGNING_SECRET || "");
+  if (signingSecret.length < 32) {
+    throw new Error("INSTALLATION_SIGNING_SECRET must contain at least 32 characters");
+  }
+  const payload = JSON.stringify({
+    a: String(accountId),
+    w: String(workerName),
+    t: Math.floor(Number(now) / 1000),
+    n: rand(16),
+  });
+  const key = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(signingSecret),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"],
+  );
+  const signature = await crypto.subtle.sign(
+    "HMAC", key, new TextEncoder().encode(payload),
+  );
+  return `nv1.${b64url(new TextEncoder().encode(payload))}.${b64url(new Uint8Array(signature))}`;
 }
 
 function rname() {
@@ -105,7 +139,7 @@ export async function downloadWorkerCode(env) {
       }
       const code = await r.text();
       if (validWorkerCode(code)) return code;
-      last = "source failed Nova integrity checks";
+      last = "release artifact failed Nova integrity checks";
     } catch (e) {
       last = (e && e.message) || String(e);
     }
@@ -219,7 +253,13 @@ export async function install(env, chatId, token, userId, lang = "en") {
 
     await set("deploy", "run");
     const workerName = "nova-" + rname();
-    const bindings = [{ type: "d1", name: "DB", id: dbId }];
+    const installationFingerprint = await createInstallationFingerprint(
+      env, accountId, workerName,
+    );
+    const bindings = [
+      { type: "secret_text", name: "NOVA_INSTALLATION_ID", text: installationFingerprint },
+      { type: "d1", name: "DB", id: dbId },
+    ];
     if (kvId) bindings.unshift({ type: "kv_namespace", name: "KV", namespace_id: kvId });
     const metadata = {
       main_module: "worker.js",
@@ -277,9 +317,10 @@ async function waitForOnline(url) {
 }
 
 function sendResult(env, chatId, url, online, lang = "en") {
+  const panelUrl = adminUrl(url);
   const text =
     t(lang, "result_title") + "\n\n" +
-    `<b>${t(lang, "result_addr")}</b>\n<code>${url}</code>\n\n` +
+    `<b>${t(lang, "result_addr")}</b>\n<code>${panelUrl}</code>\n\n` +
     t(lang, "result_setpw") +
     (online ? "" : t(lang, "result_slow")) +
     t(lang, "result_iran") +
@@ -288,7 +329,7 @@ function sendResult(env, chatId, url, online, lang = "en") {
     reply_markup: {
       inline_keyboard: [
         [{ text: t(lang, "btn_setpw"), url: url + "/install", style: "success" }],
-        [{ text: t(lang, "btn_open_panel"), url, style: "primary" }],
+        [{ text: t(lang, "btn_open_panel"), url: panelUrl, style: "primary" }],
         [{ text: t(lang, "btn_get_app"), url: "https://github.com/IRNova/Nova-Client/releases" }],
       ],
     },

@@ -4,7 +4,9 @@ import { webcrypto } from "node:crypto";
 import {
   startUpdate, loadUpdCtx, runUpdate,
 } from "../src/update.js";
-import { cf, downloadWorkerCode } from "../src/install.js";
+import {
+  adminUrl, cf, createInstallationFingerprint, downloadWorkerCode,
+} from "../src/install.js";
 
 if (!globalThis.crypto) globalThis.crypto = webcrypto;
 
@@ -51,7 +53,7 @@ test("update token is encrypted and bindings are inherited", async () => {
   const env = {
     BOT_TOKEN: "123456789:high-entropy-telegram-secret-for-tests",
     DB: db,
-    WORKER_JS_URL: "https://raw.githubusercontent.com/IRNova/Nova-Proxy/main/worker.js",
+    WORKER_JS_URL: "https://raw.githubusercontent.com/IRNova/Nova-Release/main/worker.js",
   };
   const token = "cfut_" + "A".repeat(60);
   const bindings = [
@@ -59,10 +61,16 @@ test("update token is encrypted and bindings are inherited", async () => {
     { type: "kv_namespace", name: "KV", namespace_id: "kv-123" },
   ];
   let uploaded = "";
+  let editedMessage = null;
 
   globalThis.fetch = async (url, init = {}) => {
     const target = String(url);
-    if (target.startsWith("https://api.telegram.org/")) return json({ message_id: 10 });
+    if (target.startsWith("https://api.telegram.org/")) {
+      if (target.endsWith("/editMessageText")) {
+        editedMessage = JSON.parse(init.body);
+      }
+      return json({ message_id: 10 });
+    }
     if (target === env.WORKER_JS_URL) {
       const markers =
         "const Version = 'test';const NOVA_BUILD='test';" +
@@ -96,9 +104,39 @@ test("update token is encrypted and bindings are inherited", async () => {
     assert.match(uploaded, /"type":"inherit","name":"DB"/);
     assert.match(uploaded, /"type":"inherit","name":"KV"/);
     assert.equal(uploaded.includes(token), false);
+    assert.equal(
+      editedMessage.reply_markup.inline_keyboard[0][0].url,
+      "https://nova-test.example.workers.dev/admin",
+    );
   } finally {
     globalThis.fetch = originalFetch;
   }
+});
+
+test("admin URL points directly at the panel", () => {
+  assert.equal(adminUrl("https://nova.example.workers.dev"),
+    "https://nova.example.workers.dev/admin");
+  assert.equal(adminUrl("https://nova.example.workers.dev/"),
+    "https://nova.example.workers.dev/admin");
+});
+
+test("installation fingerprint is signed and does not expose the signing secret", async () => {
+  const signingSecret = "test-only-signing-secret-that-is-long-enough";
+  const fingerprint = await createInstallationFingerprint(
+    { INSTALLATION_SIGNING_SECRET: signingSecret },
+    "account-123", "nova-test", 1785537000000,
+  );
+  assert.match(fingerprint, /^nv1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
+  assert.equal(fingerprint.includes(signingSecret), false);
+  assert.equal(fingerprint.includes("account-123"), false);
+  assert.equal(fingerprint.includes("nova-test"), false);
+});
+
+test("installation refuses to continue without a signing secret", async () => {
+  await assert.rejects(
+    createInstallationFingerprint({}, "account-123", "nova-test"),
+    /INSTALLATION_SIGNING_SECRET/,
+  );
 });
 
 test("installer uses a redirect mode supported by Cloudflare Workers", async () => {
