@@ -1,14 +1,24 @@
 // Web admin panel: cookie-auth login, a dashboard, JSON CRUD APIs, broadcast.
-// All routes live under /admin. Auth = an HMAC-signed cookie keyed on ADMIN_PASSWORD.
+// All routes live under /admin. Auth = password, then a Telegram second factor,
+// then an HMAC-signed cookie keyed on ADMIN_PASSWORD.
 
 import { tg, send, esc } from "./telegram.js";
 import { getConfig, setConfig, listFaq, listSections, stats, overview, listWaitingQa, markBlocked, listUsers, setBanned, getQa, getUserLang, setQaAnswer, isBanned, listOffenders, resetOffender, setOffenderStatus } from "./db.js";
 import { suggestFaqs, aiEnabled } from "./ai.js";
 import { contactKb } from "./bot.js";
 import { t } from "./i18n.js";
-import { DASHBOARD_HTML, LOGIN_HTML } from "./admin_ui.js";
+import { DASHBOARD_HTML, LOGIN_HTML, VERIFY_HTML } from "./admin_ui.js";
+import {
+  startChallenge, verifyChallenge, getPanelAdminIds, setPanelAdminIds,
+  isLockedOut, noteLoginFailure, clearLoginFailures, timingSafeEqual as ctEqual,
+} from "./admin_2fa.js";
 
 const COOKIE = "nova_admin";
+const PENDING = "nova_2fa";
+// Sessions used to last 30 days. With a second factor in front of them, a
+// shorter window costs one extra sign-in a week and sharply limits how long a
+// stolen cookie stays useful.
+const SESSION_DAYS = 7;
 
 // ── crypto: sign / verify the session cookie ────────────────────────────────
 
@@ -44,14 +54,13 @@ async function validToken(env, token) {
   if (!token) return false;
   const [ts, sig] = token.split(".");
   if (!ts || !sig) return false;
-  // 30-day sessions.
-  if (Date.now() - Number(ts) > 30 * 864e5) return false;
-  return (await hmac(env, ts)) === sig;
+  if (Date.now() - Number(ts) > SESSION_DAYS * 864e5) return false;
+  return ctEqual(await hmac(env, ts), sig);
 }
 
-function cookieValue(request) {
+function cookieValue(request, name = COOKIE) {
   const raw = request.headers.get("Cookie") || "";
-  const m = raw.match(new RegExp(`${COOKIE}=([^;]+)`));
+  const m = raw.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));
   return m ? decodeURIComponent(m[1]) : "";
 }
 
@@ -68,18 +77,66 @@ export async function handleAdmin(request, env, ctx, url) {
   const path = url.pathname;
   const method = request.method;
 
+  const html = (body, status = 200) =>
+    new Response(body, { status, headers: { "Content-Type": "text/html" } });
+
   if (path === "/admin/login" && method === "POST") {
+    const ip = request.headers.get("CF-Connecting-IP") || "";
+    // Throttle first, so a locked-out client cannot keep testing passwords.
+    if (await isLockedOut(env, ip)) return html(LOGIN_HTML("locked"), 429);
+
     const form = await request.formData();
     const pw = form.get("password") || "";
     if (!env.ADMIN_PASSWORD || !timingSafeEqual(pw, env.ADMIN_PASSWORD)) {
-      return new Response(LOGIN_HTML(true), { status: 401, headers: { "Content-Type": "text/html" } });
+      await noteLoginFailure(env, ip);
+      return html(LOGIN_HTML("bad"), 401);
     }
+
+    // Password alone is no longer enough. Without a configured allowlist there
+    // is nobody to send a code to, so refuse rather than fall back to
+    // password-only access.
+    const ch = await startChallenge(env, { ip, ua: request.headers.get("User-Agent") || "" });
+    if (!ch) return html(LOGIN_HTML("no2fa"), 403);
+    if (!ch.challengeId) return html(LOGIN_HTML("undeliverable"), 502);
+
+    // Issuing a code counts against the same lockout budget. Otherwise someone
+    // who already had the password could sit and spam an admin's Telegram with
+    // codes forever without ever tripping the throttle. Completing the second
+    // factor is what clears the counter.
+    await noteLoginFailure(env, ip);
+    return new Response(VERIFY_HTML(null, ch.delivered), {
+      status: 200,
+      headers: {
+        "Content-Type": "text/html",
+        "Set-Cookie": `${PENDING}=${encodeURIComponent(ch.challengeId)}; Path=/admin; HttpOnly; Secure; SameSite=Lax; Max-Age=300`,
+      },
+    });
+  }
+
+  if (path === "/admin/verify" && method === "POST") {
+    const ip = request.headers.get("CF-Connecting-IP") || "";
+    if (await isLockedOut(env, ip)) return html(LOGIN_HTML("locked"), 429);
+
+    const form = await request.formData();
+    const res = await verifyChallenge(env, cookieValue(request, PENDING), form.get("code") || "");
+    if (!res.ok) {
+      // A dead challenge sends the user back to the password step; a merely
+      // wrong digit keeps them on the code step with their remaining tries.
+      if (res.reason === "wrong") return html(VERIFY_HTML("wrong", 0, res.left), 401);
+      await noteLoginFailure(env, ip);
+      return new Response(LOGIN_HTML(res.reason === "burned" ? "burned" : "expired"), {
+        status: 401,
+        headers: { "Content-Type": "text/html", "Set-Cookie": `${PENDING}=; Path=/admin; Max-Age=0` },
+      });
+    }
+
+    await clearLoginFailures(env, ip);
     const token = await makeToken(env);
     return new Response(null, {
       status: 302,
       headers: {
         Location: "/admin",
-        "Set-Cookie": `${COOKIE}=${encodeURIComponent(token)}; Path=/admin; HttpOnly; Secure; SameSite=Lax; Max-Age=${30 * 864e5 / 1000}`,
+        "Set-Cookie": `${COOKIE}=${encodeURIComponent(token)}; Path=/admin; HttpOnly; Secure; SameSite=Lax; Max-Age=${SESSION_DAYS * 86400}`,
       },
     });
   }
@@ -87,7 +144,11 @@ export async function handleAdmin(request, env, ctx, url) {
   if (path === "/admin/logout") {
     return new Response(null, {
       status: 302,
-      headers: { Location: "/admin", "Set-Cookie": `${COOKIE}=; Path=/admin; Max-Age=0` },
+      headers: [
+        ["Location", "/admin"],
+        ["Set-Cookie", `${COOKIE}=; Path=/admin; Max-Age=0`],
+        ["Set-Cookie", `${PENDING}=; Path=/admin; Max-Age=0`],
+      ],
     });
   }
 
@@ -114,6 +175,18 @@ async function handleApi(request, env, ctx, res, method) {
 
   if (res === "stats" && method === "GET") {
     return json(await stats(env));
+  }
+
+  // Who may complete a panel sign-in. These ids receive the Telegram code, so
+  // emptying the list locks the panel for everyone, including the caller.
+  if (res === "panel-admins" && method === "GET") {
+    return json({ ids: await getPanelAdminIds(env) });
+  }
+
+  if (res === "panel-admins" && method === "POST") {
+    const ids = await setPanelAdminIds(env, body.ids ?? "");
+    if (!ids.length) return json({ ids, warning: "empty_locks_panel" });
+    return json({ ids });
   }
 
   // Richer payload for the Overview pane: counters + 14-day series + recent Q&A.

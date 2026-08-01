@@ -339,6 +339,8 @@ textarea{min-height:96px;resize:vertical;line-height:1.6}
 .peek.on .eon{display:none}
 .peek.on .eoff{display:block}
 .login-err{color:var(--dg);font-size:12.5px;font-weight:600;margin:0 0 12px}
+.login-sub{color:var(--mu);font-size:12.5px;line-height:1.6;margin:0 0 14px}
+#code{letter-spacing:6px;text-align:center;font-size:18px;font-weight:700}
 .btn.go{width:100%;height:44px;margin-top:16px;font-size:14px}
 .login-foot{text-align:center;color:var(--mu);font-size:11.5px;margin-top:18px}
 `;
@@ -356,7 +358,10 @@ try{var th=localStorage.getItem('nova-theme')||'dark';document.documentElement.s
 var lg=localStorage.getItem('nova-lang')||'en';document.documentElement.lang=lg;document.documentElement.dir=lg==='fa'?'rtl':'ltr';}catch(e){}
 </script>`;
 
-export function LOGIN_HTML(failed) {
+// `reason` is null for a clean form, otherwise one of:
+// bad | locked | no2fa | undeliverable | expired | burned
+export function LOGIN_HTML(reason) {
+  const failed = !!reason;
   return HEAD("Nova Bot Admin") + `<body class="login-body">${THEME_BOOT}
 <div class="login-box">
  <div class="login-bar">
@@ -368,7 +373,7 @@ export function LOGIN_HTML(failed) {
  </div>
  <div class="login-card">
   <div class="kicker" id="t1">Sign in to the admin panel</div>
-  ${failed ? '<p class="login-err" id="bad" role="alert">Wrong password.</p>' : ''}
+  ${failed ? `<p class="login-err" id="bad" role="alert" data-r="${reason}">Sign-in failed.</p>` : ''}
   <form method="POST" action="/admin/login">
    <label id="lpw" for="pw">Password</label>
    <div class="pwwrap">
@@ -381,20 +386,66 @@ export function LOGIN_HTML(failed) {
  <p class="login-foot" id="ft">Nova Proxy, open-source networking tools</p>
 </div>
 <script>
-var T={en:{t1:'Sign in to the admin panel',lpw:'Password',pw:'password',go:'Sign in',bad:'Wrong password.',bs:'Admin panel',ft:'Nova Proxy, open-source networking tools',showpw:'Show password',hidepw:'Hide password',theme:'Theme'},
-fa:{t1:'ورود به پنل مدیریت',lpw:'رمز عبور',pw:'رمز عبور',go:'ورود',bad:'رمز اشتباه است.',bs:'پنل مدیریت',ft:'نوا پراکسی، ابزار شبکه متن‌باز',showpw:'نمایش رمز',hidepw:'پنهان کردن رمز',theme:'پوسته'}};
+var T={en:{t1:'Sign in to the admin panel',lpw:'Password',pw:'password',go:'Sign in',bs:'Admin panel',ft:'Nova Proxy, open-source networking tools',showpw:'Show password',hidepw:'Hide password',theme:'Theme',
+E:{bad:'Wrong password.',locked:'Too many attempts. Try again in 15 minutes.',no2fa:'Two-step sign-in is not set up yet. Add an admin Telegram ID first.',undeliverable:'The code could not be delivered on Telegram. Check the admin IDs.',expired:'That code expired. Please sign in again.',burned:'Too many wrong codes. Please sign in again.'}},
+fa:{t1:'ورود به پنل مدیریت',lpw:'رمز عبور',pw:'رمز عبور',go:'ورود',bs:'پنل مدیریت',ft:'نوا پراکسی، ابزار شبکه متن‌باز',showpw:'نمایش رمز',hidepw:'پنهان کردن رمز',theme:'پوسته',
+E:{bad:'رمز اشتباه است.',locked:'تلاش بیش از حد. ۱۵ دقیقه دیگر دوباره امتحان کنید.',no2fa:'ورود دو مرحله‌ای هنوز تنظیم نشده است. ابتدا شناسه تلگرام مدیر را اضافه کنید.',undeliverable:'ارسال کد در تلگرام ناموفق بود. شناسه‌های مدیر را بررسی کنید.',expired:'این کد منقضی شد. دوباره وارد شوید.',burned:'کد اشتباه زیاد وارد شد. دوباره وارد شوید.'}}};
 function $(i){return document.getElementById(i)}
 var lang=localStorage.getItem('nova-lang')||'en',theme=localStorage.getItem('nova-theme')||'dark';
 function ap(){var t=T[lang];document.documentElement.lang=lang;document.documentElement.dir=lang==='fa'?'rtl':'ltr';
 $('t1').textContent=t.t1;$('lpw').textContent=t.lpw;$('pw').placeholder=t.pw;$('go').textContent=t.go;$('brandsub').textContent=t.bs;$('ft').textContent=t.ft;
 $('theme').title=t.theme;
 $('peek').setAttribute('aria-label',$('pw').type==='password'?t.showpw:t.hidepw);
-if($('bad'))$('bad').textContent=t.bad;
+if($('bad'))$('bad').textContent=t.E[$('bad').dataset.r]||t.E.bad;
 [].forEach.call(document.querySelectorAll('#lg button'),function(b){b.classList.toggle('on',b.dataset.l===lang)})}
 function at(){document.documentElement.setAttribute('data-theme',theme)}
 $('lg').onclick=function(e){var b=e.target.closest('button');if(b){lang=b.dataset.l;localStorage.setItem('nova-lang',lang);ap()}};
 $('theme').onclick=function(){theme=theme==='dark'?'light':'dark';localStorage.setItem('nova-theme',theme);at()};
 $('peek').onclick=function(){var i=$('pw');var show=i.type==='password';i.type=show?'text':'password';this.classList.toggle('on',show);this.setAttribute('aria-label',show?T[lang].hidepw:T[lang].showpw);i.focus()};
+at();ap();
+</script></body></html>`;
+}
+
+// Step two of sign-in: the code sent over Telegram. `err` is null or 'wrong',
+// `delivered` is how many admins received it, `left` is remaining attempts.
+export function VERIFY_HTML(err, delivered = 0, left = 0) {
+  return HEAD("Nova Bot Admin") + `<body class="login-body">${THEME_BOOT}
+<div class="login-box">
+ <div class="login-bar">
+  <div class="brand"><span class="mark">${LOGO}</span><div><div class="name" id="brand">Nova Bot</div><div class="env"><span class="d"></span><span id="brandsub">Admin panel</span></div></div></div>
+  <div class="top-actions">
+   <div class="lang" id="lg"><button type="button" data-l="en" class="on">EN</button><button type="button" data-l="fa">فا</button></div>
+   <button type="button" class="iconbtn" id="theme" title="Theme">${SUN}${MOON}</button>
+  </div>
+ </div>
+ <div class="login-card">
+  <div class="kicker" id="t1">Enter the code sent on Telegram</div>
+  <p class="login-sub" id="sub" data-n="${delivered}">We sent a 6-digit code to your Telegram.</p>
+  ${err ? `<p class="login-err" id="bad" role="alert" data-left="${left}">Wrong code.</p>` : ''}
+  <form method="POST" action="/admin/verify">
+   <label id="lcode" for="code">Code</label>
+   <input type="text" name="code" id="code" placeholder="123456" autofocus autocomplete="one-time-code"
+          inputmode="numeric" pattern="[0-9]{6}" maxlength="6" required>
+   <button class="btn go" type="submit" id="go">Verify</button>
+  </form>
+  <p class="login-foot"><a href="/admin" id="back">Back to sign in</a></p>
+ </div>
+ <p class="login-foot" id="ft">Nova Proxy, open-source networking tools</p>
+</div>
+<script>
+var T={en:{t1:'Enter the code sent on Telegram',lcode:'Code',go:'Verify',bad:'Wrong code.',left:' attempts left.',bs:'Admin panel',ft:'Nova Proxy, open-source networking tools',theme:'Theme',back:'Back to sign in',sub1:'We sent a 6-digit code to your Telegram.',subN:'We sent a 6-digit code to your Telegram admins.'},
+fa:{t1:'کدی که در تلگرام فرستاده شد را وارد کنید',lcode:'کد',go:'تایید',bad:'کد اشتباه است.',left:' تلاش باقی مانده.',bs:'پنل مدیریت',ft:'نوا پراکسی، ابزار شبکه متن‌باز',theme:'پوسته',back:'بازگشت به ورود',sub1:'یک کد ۶ رقمی به تلگرام شما فرستادیم.',subN:'یک کد ۶ رقمی برای مدیران تلگرام فرستادیم.'}};
+function $(i){return document.getElementById(i)}
+var lang=localStorage.getItem('nova-lang')||'en',theme=localStorage.getItem('nova-theme')||'dark';
+function ap(){var t=T[lang];document.documentElement.lang=lang;document.documentElement.dir=lang==='fa'?'rtl':'ltr';
+$('t1').textContent=t.t1;$('lcode').textContent=t.lcode;$('go').textContent=t.go;$('brandsub').textContent=t.bs;$('ft').textContent=t.ft;$('back').textContent=t.back;
+$('theme').title=t.theme;
+$('sub').textContent=Number($('sub').dataset.n)>1?t.subN:t.sub1;
+if($('bad')){var n=Number($('bad').dataset.left);$('bad').textContent=t.bad+(n>0?' '+n+t.left:'')}
+[].forEach.call(document.querySelectorAll('#lg button'),function(b){b.classList.toggle('on',b.dataset.l===lang)})}
+function at(){document.documentElement.setAttribute('data-theme',theme)}
+$('lg').onclick=function(e){var b=e.target.closest('button');if(b){lang=b.dataset.l;localStorage.setItem('nova-lang',lang);ap()}};
+$('theme').onclick=function(){theme=theme==='dark'?'light':'dark';localStorage.setItem('nova-theme',theme);at()};
 at();ap();
 </script></body></html>`;
 }
