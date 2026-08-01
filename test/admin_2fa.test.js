@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import {
   startChallenge, verifyChallenge, getPanelAdminIds, setPanelAdminIds,
   isLockedOut, noteLoginFailure, clearLoginFailures,
+  getSessionKey, rotateSessionKey,
 } from "../src/admin_2fa.js";
 
 // Minimal in-memory stand-in for the config table plus Telegram delivery.
@@ -53,8 +54,8 @@ function makeEnv({ admins = "", deliver = true } = {}) {
   return env;
 }
 
-function codeFrom(env) {
-  const m = env.sent.at(-1).text.match(/<code>(\d{6})<\/code>/);
+function codeFrom(env, idx = -1) {
+  const m = env.sent.at(idx).text.match(/<code>(\d{6})<\/code>/);
   return m && m[1];
 }
 
@@ -141,4 +142,78 @@ test("repeated password failures lock the source IP out", async () => {
   assert.equal(await isLockedOut(env, "8.8.8.8"), false);
   await clearLoginFailures(env, "9.9.9.9");
   assert.equal(await isLockedOut(env, "9.9.9.9"), false);
+});
+
+test("session key is random, persisted, and not the admin password", async () => {
+  const env = makeEnv({ admins: "111" });
+  const k1 = await getSessionKey(env);
+  assert.match(k1, /^[0-9a-f]{64}$/);
+  assert.notEqual(k1, env.ADMIN_PASSWORD);
+  assert.equal(await getSessionKey(env), k1); // stable across reads
+  const k2 = await rotateSessionKey(env);
+  assert.notEqual(k2, k1);
+  assert.equal(await getSessionKey(env), k2);
+});
+
+test("two admins get different codes, and the code identifies who approved", async () => {
+  const env = makeEnv({ admins: "111,222" });
+  const ch = await startChallenge(env);
+  assert.equal(ch.delivered, 2);
+  const codeA = codeFrom(env, -2); // sent to 111
+  const codeB = codeFrom(env, -1); // sent to 222
+  assert.notEqual(codeA, codeB);
+  const r = await verifyChallenge(env, ch.challengeId, codeB);
+  assert.equal(r.ok, true);
+  assert.equal(r.adminId, "222");
+});
+
+test("one admin's code still works when several were issued", async () => {
+  const env = makeEnv({ admins: "111,222" });
+  const ch = await startChallenge(env);
+  const r = await verifyChallenge(env, ch.challengeId, codeFrom(env, -2));
+  assert.equal(r.ok, true);
+  assert.equal(r.adminId, "111");
+});
+
+// The regression that motivated the session key: the old cookie was
+// ts + "." + HMAC(ADMIN_PASSWORD, ts), so anyone holding the password could
+// mint a session offline and never touch the Telegram second factor.
+test("knowing ADMIN_PASSWORD does not let you forge a session", async () => {
+  const { makeToken, validToken } = await import("../src/admin.js");
+  const env = makeEnv({ admins: "111" });
+
+  const real = await makeToken(env, "111");
+  assert.equal(await validToken(env, real), true);
+
+  // Reproduce the old scheme using only the password an attacker would know.
+  async function legacyForge(password, adminId) {
+    const ts = Date.now().toString();
+    const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(password),
+      { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+    const sigTs = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(ts));
+    const sigNew = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(`${ts}.${adminId}`));
+    const hex = (b) => [...new Uint8Array(b)].map((x) => x.toString(16).padStart(2, "0")).join("");
+    return [`${ts}.${hex(sigTs)}`, `${ts}.${adminId}.${hex(sigNew)}`];
+  }
+  for (const forged of await legacyForge(env.ADMIN_PASSWORD, "111")) {
+    assert.equal(await validToken(env, forged), false);
+  }
+});
+
+test("removing an admin immediately invalidates their live session", async () => {
+  const { makeToken, validToken } = await import("../src/admin.js");
+  const env = makeEnv({ admins: "111,222" });
+  const t222 = await makeToken(env, "222");
+  assert.equal(await validToken(env, t222), true);
+  await setPanelAdminIds(env, "111");
+  assert.equal(await validToken(env, t222), false);
+});
+
+test("rotating the session key logs everyone out", async () => {
+  const { makeToken, validToken } = await import("../src/admin.js");
+  const env = makeEnv({ admins: "111" });
+  const tok = await makeToken(env, "111");
+  assert.equal(await validToken(env, tok), true);
+  await rotateSessionKey(env);
+  assert.equal(await validToken(env, tok), false);
 });

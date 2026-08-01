@@ -12,6 +12,7 @@ import { send } from "./telegram.js";
 import { getConfig, setConfig, delConfig } from "./db.js";
 
 export const ADMIN_IDS_KEY = "panel_admin_ids";
+export const SESSION_KEY = "session_key";
 
 const CHALLENGE_PREFIX = "twofa_";
 const CHALLENGE_TTL_MS = 5 * 60 * 1000; // a code is valid for 5 minutes
@@ -54,6 +55,30 @@ function randomCode() {
   let v;
   do { crypto.getRandomValues(buf); v = buf[0]; } while (v >= limit);
   return String(v % 1000000).padStart(6, "0");
+}
+
+// ── session signing key ─────────────────────────────────────────────────────
+
+// Session cookies are signed with this random key, NOT with ADMIN_PASSWORD.
+// Deriving the key from the password meant anyone who learned the password
+// could mint a valid cookie offline and skip the second factor entirely, which
+// is precisely the attack 2FA exists to stop. The repo is public, so the
+// algorithm is known; only this secret is not.
+export async function getSessionKey(env) {
+  let k = await getConfig(env, SESSION_KEY, "");
+  if (!/^[0-9a-f]{64}$/.test(k)) {
+    k = randomHex(32);
+    await setConfig(env, SESSION_KEY, k);
+  }
+  return k;
+}
+
+// Rotating the key invalidates every outstanding session at once. Use it if a
+// device is lost or an admin is removed.
+export async function rotateSessionKey(env) {
+  const k = randomHex(32);
+  await setConfig(env, SESSION_KEY, k);
+  return k;
 }
 
 // ── panel admin allowlist ───────────────────────────────────────────────────
@@ -119,9 +144,13 @@ export async function startChallenge(env, meta = {}) {
   await sweepExpired(env);
 
   const challengeId = randomHex(16);
-  const code = randomCode();
+  // Each admin gets a DIFFERENT code, so the code that comes back identifies
+  // who approved the sign-in. One shared code could not be attributed.
+  const codes = ids.map((id) => ({ id, code: randomCode() }));
   await setConfig(env, CHALLENGE_PREFIX + challengeId, JSON.stringify({
-    h: await hashCode(env, challengeId, code),
+    codes: await Promise.all(codes.map(async (c) => ({
+      id: c.id, h: await hashCode(env, challengeId, c.code),
+    }))),
     exp: Date.now() + CHALLENGE_TTL_MS,
     tries: 0,
   }));
@@ -130,16 +159,16 @@ export async function startChallenge(env, meta = {}) {
   // to sign in now knows the password is known to someone else.
   const where = [meta.ip && `IP: ${meta.ip}`, meta.ua && `Device: ${meta.ua}`]
     .filter(Boolean).join("\n");
-  const text =
-    `<b>Admin panel sign-in</b>\n\n` +
-    `Your code is <code>${code}</code>\n` +
-    `It expires in 5 minutes.\n\n` +
-    (where ? where + "\n\n" : "") +
-    `If this was not you, change ADMIN_PASSWORD now.`;
 
   let delivered = 0;
-  for (const id of ids) {
-    const r = await send(env, id, text).catch(() => null);
+  for (const c of codes) {
+    const text =
+      `<b>Admin panel sign-in</b>\n\n` +
+      `Your code is <code>${c.code}</code>\n` +
+      `It expires in 5 minutes.\n\n` +
+      (where ? where + "\n\n" : "") +
+      `If this was not you, change ADMIN_PASSWORD now.`;
+    const r = await send(env, c.id, text).catch(() => null);
     if (r && r.ok) delivered += 1;
   }
   // Nobody received the code, so the challenge is unusable. Burn it rather
@@ -163,9 +192,12 @@ export async function verifyChallenge(env, challengeId, code) {
   if (!st || Date.now() > st.exp) { await delConfig(env, key); return { ok: false, reason: "expired" }; }
   if (st.tries >= MAX_CODE_TRIES) { await delConfig(env, key); return { ok: false, reason: "burned" }; }
 
-  if (timingSafeEqual(await hashCode(env, challengeId, String(code)), st.h)) {
+  // Compare against every recipient's code so we learn which admin approved.
+  const got = await hashCode(env, challengeId, String(code));
+  const hit = (st.codes || []).find((c) => timingSafeEqual(got, c.h));
+  if (hit) {
     await delConfig(env, key); // single use
-    return { ok: true };
+    return { ok: true, adminId: String(hit.id) };
   }
 
   st.tries += 1;

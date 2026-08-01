@@ -1,6 +1,7 @@
 // Web admin panel: cookie-auth login, a dashboard, JSON CRUD APIs, broadcast.
 // All routes live under /admin. Auth = password, then a Telegram second factor,
-// then an HMAC-signed cookie keyed on ADMIN_PASSWORD.
+// then a cookie HMAC-signed with a random server-side session key (NOT the
+// password) and naming the admin who approved it.
 
 import { tg, send, esc } from "./telegram.js";
 import { getConfig, setConfig, listFaq, listSections, stats, overview, listWaitingQa, markBlocked, listUsers, setBanned, getQa, getUserLang, setQaAnswer, isBanned, listOffenders, resetOffender, setOffenderStatus } from "./db.js";
@@ -11,6 +12,7 @@ import { DASHBOARD_HTML, LOGIN_HTML, VERIFY_HTML } from "./admin_ui.js";
 import {
   startChallenge, verifyChallenge, getPanelAdminIds, setPanelAdminIds,
   isLockedOut, noteLoginFailure, clearLoginFailures, timingSafeEqual as ctEqual,
+  getSessionKey, rotateSessionKey,
 } from "./admin_2fa.js";
 
 const COOKIE = "nova_admin";
@@ -32,30 +34,35 @@ function timingSafeEqual(a, b) {
   return diff === 0;
 }
 
+// Signed with the random session key, never with ADMIN_PASSWORD. If the
+// password were the key, anyone who learned it could mint a cookie offline and
+// walk straight past the Telegram second factor.
 async function hmac(env, data) {
   const key = await crypto.subtle.importKey(
-    "raw", new TextEncoder().encode(env.ADMIN_PASSWORD || "unset"),
+    "raw", new TextEncoder().encode(await getSessionKey(env)),
     { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const sig = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(data));
   return [...new Uint8Array(sig)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function makeToken(env) {
+// The approving admin's Telegram id is part of the signed payload, so a session
+// records who opened it and can be revoked by dropping that id.
+export async function makeToken(env, adminId) {
   const ts = Date.now().toString();
-  return `${ts}.${await hmac(env, ts)}`;
+  return `${ts}.${adminId}.${await hmac(env, `${ts}.${adminId}`)}`;
 }
 
-async function validToken(env, token) {
-  // Fail closed when no admin password is configured. Otherwise the cookie would
-  // be signed with the constant fallback key ("unset"), which anyone reading this
-  // (now-public) code could use to forge a valid session. No password set = no
-  // admin access, full stop.
+export async function validToken(env, token) {
+  // No password configured means no admin access at all, unchanged.
   if (!env.ADMIN_PASSWORD) return false;
   if (!token) return false;
-  const [ts, sig] = token.split(".");
-  if (!ts || !sig) return false;
+  const [ts, adminId, sig] = token.split(".");
+  if (!ts || !adminId || !sig) return false;
   if (Date.now() - Number(ts) > SESSION_DAYS * 864e5) return false;
-  return ctEqual(await hmac(env, ts), sig);
+  if (!ctEqual(await hmac(env, `${ts}.${adminId}`), sig)) return false;
+  // Removing someone from the allowlist kills their live sessions immediately
+  // rather than leaving them valid for up to a week.
+  return (await getPanelAdminIds(env)).includes(String(adminId));
 }
 
 function cookieValue(request, name = COOKIE) {
@@ -131,7 +138,7 @@ export async function handleAdmin(request, env, ctx, url) {
     }
 
     await clearLoginFailures(env, ip);
-    const token = await makeToken(env);
+    const token = await makeToken(env, res.adminId);
     return new Response(null, {
       status: 302,
       headers: {
@@ -156,7 +163,7 @@ export async function handleAdmin(request, env, ctx, url) {
   const ok = await authed(request, env);
 
   if (path === "/admin" || path === "/admin/") {
-    if (!ok) return new Response(LOGIN_HTML(false), { headers: { "Content-Type": "text/html" } });
+    if (!ok) return new Response(LOGIN_HTML(null), { headers: { "Content-Type": "text/html" } });
     return new Response(DASHBOARD_HTML, { headers: { "Content-Type": "text/html" } });
   }
 
@@ -187,6 +194,13 @@ async function handleApi(request, env, ctx, res, method) {
     const ids = await setPanelAdminIds(env, body.ids ?? "");
     if (!ids.length) return json({ ids, warning: "empty_locks_panel" });
     return json({ ids });
+  }
+
+  // "Log out everywhere": rotating the signing key invalidates every session,
+  // including the caller's. Use after losing a device.
+  if (res === "revoke-sessions" && method === "POST") {
+    await rotateSessionKey(env);
+    return json({ ok: true, note: "all_sessions_invalidated" });
   }
 
   // Richer payload for the Overview pane: counters + 14-day series + recent Q&A.
