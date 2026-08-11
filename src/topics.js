@@ -24,16 +24,32 @@ export const TOPICS = {
 
 const FORUM_KEY = "admin_forum";
 
-/** Is the admin group a forum? Cached, since it changes about once ever. */
+/* Is the admin group a forum?
+ *
+ * A yes is cached forever: a group does not stop being a forum, and if it ever
+ * did, sending to a dead thread already falls back on its own.
+ *
+ * A no has to EXPIRE, and getting that wrong is the whole difference between
+ * this feature working and appearing not to exist. Turning Topics on is a
+ * Telegram group setting the owner changes by hand, long after the bot last
+ * looked. Caching "not a forum" permanently means they follow the instructions,
+ * see no change, and reasonably conclude the feature is broken. An hour is short
+ * enough that nobody is left wondering and long enough to cost one getChat.
+ */
+const FORUM_RECHECK_MS = 60 * 60 * 1000;
+
 async function isForum(env, group) {
   const cached = await getConfig(env, FORUM_KEY, "");
   if (cached === "1") return true;
-  if (cached === "0") return false;
+  if (cached.startsWith("0:")) {
+    const age = Date.now() - Number(cached.slice(2));
+    if (age >= 0 && age < FORUM_RECHECK_MS) return false;
+  }
   const r = await tg(env, "getChat", { chat_id: group }).catch(() => null);
   // An unreachable API is not evidence either way, so don't cache a guess.
   if (!r || r.ok !== true) return false;
   const forum = !!(r.result && r.result.is_forum);
-  await setConfig(env, FORUM_KEY, forum ? "1" : "0").catch(() => {});
+  await setConfig(env, FORUM_KEY, forum ? "1" : `0:${Date.now()}`).catch(() => {});
   return forum;
 }
 
@@ -51,10 +67,10 @@ export async function productThread(env, group, product) {
     chat_id: group, name: spec.name, icon_color: spec.color,
   }).catch(() => null);
   if (!r || r.ok !== true || !r.result) {
-    /* Almost always a missing manage_topics permission. Remember that topics are
-     * unavailable so this does not attempt a create on every single message; the
-     * admin re-enables it from the panel, which clears the flag. */
-    await setConfig(env, FORUM_KEY, "0").catch(() => {});
+    /* Almost always a missing manage_topics permission. Recorded so this does
+     * not attempt a create on every message, and recorded with a timestamp so
+     * granting the permission takes effect on its own within the hour. */
+    await setConfig(env, FORUM_KEY, `0:${Date.now()}`).catch(() => {});
     return null;
   }
   const id = r.result.message_thread_id;
