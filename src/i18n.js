@@ -126,6 +126,46 @@ export const STR = {
     upd_bindings_changed:
       "Cloudflare did not preserve the Worker's bindings exactly. Review this Worker in the Cloudflare dashboard before using it.",
     upd_expired: "This update session has expired. Tap 🔄 Update my panel and send your token again.",
+    /* /recover: the 1101 rescue. The copy leads with what is KEPT, because the
+     * word "delete" is the one thing a user with a broken panel is most afraid
+     * of, and the honest answer is that nothing they care about is deleted. */
+    rec_text:
+      "🩺 <b>Fix a broken panel</b>\n\n" +
+      "If your panel answers <b>error 1101</b> on every page, the Cloudflare Worker slot it runs in has jammed. " +
+      "Re-uploading the code does not clear that, which is why 🔄 Update does not help here.\n\n" +
+      "This rebuilds the Worker from scratch, in place:\n" +
+      "✅ Your users, subscriptions and settings are <b>kept</b> (they live in the database, which is not touched)\n" +
+      "✅ Your panel address stays the <b>same</b>, so subscription links your users already have keep working\n" +
+      "⚠️ The panel is offline for a few seconds while it is rebuilt\n\n" +
+      "Send the same Cloudflare API token you use for updates.",
+    rec_pick: "Which panel should I rebuild?",
+    rec_confirm: (name) =>
+      `⚠️ <b>Rebuild «${name}»?</b>\n\n` +
+      "I will delete this Worker and immediately create it again with the same name, the same database and the latest Nova code.\n\n" +
+      "Your users and settings are kept. The panel is unreachable for a few seconds. Only continue if this panel is actually broken.",
+    btn_rec_go: "🩺 Yes, rebuild it",
+    btn_recover: "🩺 Fix a broken panel (1101)",
+    rec_run: "🩺 <b>Rebuilding…</b>",
+    rs_verify: "Checking the panel",
+    rs_read: "Saving its database links",
+    rs_fetch: "Fetching verified Nova code",
+    rs_delete: "Clearing the jammed slot",
+    rs_create: "Creating the panel again",
+    rs_enable: "Putting it back online",
+    rs_online: "Waiting for the first reply",
+    rec_done: (name) => `✅ <b>Rebuilt!</b>\n\n«${name}» is running again on the latest Nova, with all of its users and settings.`,
+    rec_not_nova: "That Worker is not a Nova panel (it has no Nova database attached), so I did not touch it.",
+    rec_no_db: "I could not read this panel's database link, so I stopped before changing anything. Contact support rather than deleting the Worker yourself.",
+    /* Shown only in the one case that matters: the delete succeeded and the
+     * create did not. The panel is gone but the DATA is not, and a user staring
+     * at a missing panel needs to be told that in the same breath. */
+    rec_stranded:
+      "⚠️ <b>Your data is safe.</b> The database was not touched, so your users and settings are all still there. " +
+      "Run 🩺 Fix a broken panel again in a minute; if it keeps failing, contact support and mention the panel name.",
+    rec_slow: "It has not answered yet. Cloudflare sometimes needs a minute after a rebuild, so give it a moment and reload.",
+    rec_domains: (n) => `🌐 Reattached ${n} custom domain(s).`,
+    rec_lost_secrets: (names) =>
+      `⚠️ These extra secrets could not be carried over and must be re-added by hand: <code>${names}</code>`,
 
     // support us
     btn_support: "Support us",
@@ -322,6 +362,40 @@ export const STR = {
     upd_bindings_changed:
       "Cloudflare اتصال‌های ورکر را دقیقاً حفظ نکرد. پیش از استفاده، این ورکر را در داشبورد Cloudflare بررسی کن.",
     upd_expired: "این نشست به‌روزرسانی منقضی شد. روی 🔄 به‌روزرسانی پنل من بزن و دوباره توکن را بفرست.",
+    rec_text:
+      "🩺 <b>تعمیر پنل خراب</b>\n\n" +
+      "اگر پنل شما در هر صفحه <b>خطای 1101</b> می‌دهد، یعنی جایگاه ورکر کلودفلری که روی آن اجرا می‌شود گیر کرده. " +
+      "آپلود دوبارهٔ کد این را باز نمی‌کند، برای همین 🔄 به‌روزرسانی اینجا کمکی نمی‌کند.\n\n" +
+      "این گزینه ورکر را همان‌جا از نو می‌سازد:\n" +
+      "✅ کاربران، اشتراک‌ها و تنظیمات شما <b>می‌مانند</b> (در دیتابیس هستند و دست نمی‌خورد)\n" +
+      "✅ آدرس پنل <b>عوض نمی‌شود</b>، پس لینک‌های اشتراکی که کاربرانتان دارند کار می‌کنند\n" +
+      "⚠️ پنل چند ثانیه در حین ساخت از دسترس خارج می‌شود\n\n" +
+      "همان توکن API کلودفلری را بفرست که برای به‌روزرسانی استفاده می‌کنی.",
+    rec_pick: "کدام پنل را از نو بسازم؟",
+    rec_confirm: (name) =>
+      `⚠️ <b>«${bidi(name)}» از نو ساخته شود؟</b>\n\n` +
+      "این ورکر را حذف می‌کنم و بلافاصله با همان نام، همان دیتابیس و آخرین کد نوا دوباره می‌سازم.\n\n" +
+      "کاربران و تنظیمات شما می‌مانند. پنل چند ثانیه در دسترس نیست. فقط وقتی ادامه بده که این پنل واقعاً خراب باشد.",
+    btn_rec_go: "🩺 بله، از نو بساز",
+    btn_recover: "🩺 تعمیر پنل خراب (1101)",
+    rec_run: "🩺 <b>در حال ساخت دوباره…</b>",
+    rs_verify: "بررسی پنل",
+    rs_read: "ذخیرهٔ اتصال دیتابیس",
+    rs_fetch: "گرفتن کد تأییدشدهٔ نوا",
+    rs_delete: "آزادکردن جایگاه گیرکرده",
+    rs_create: "ساخت دوبارهٔ پنل",
+    rs_enable: "برگرداندن به حالت آنلاین",
+    rs_online: "منتظر اولین پاسخ",
+    rec_done: (name) => `✅ <b>ساخته شد!</b>\n\n«${bidi(name)}» دوباره با آخرین نسخهٔ نوا بالا آمد، با همهٔ کاربران و تنظیماتش.`,
+    rec_not_nova: "آن ورکر پنل نوا نیست (دیتابیس نوا به آن وصل نیست)، پس دستش نزدم.",
+    rec_no_db: "نتوانستم اتصال دیتابیس این پنل را بخوانم، پس قبل از هر تغییری متوقف شدم. به‌جای حذف دستی ورکر، با پشتیبانی تماس بگیر.",
+    rec_stranded:
+      "⚠️ <b>اطلاعات شما سالم است.</b> دیتابیس دست نخورده، پس همهٔ کاربران و تنظیمات سر جایشان هستند. " +
+      "یک دقیقه بعد دوباره 🩺 تعمیر پنل خراب را بزن؛ اگر باز هم نشد با پشتیبانی تماس بگیر و نام پنل را بگو.",
+    rec_slow: "هنوز جواب نداده. کلودفلر گاهی بعد از ساخت دوباره یک دقیقه وقت می‌خواهد، کمی صبر کن و صفحه را تازه کن.",
+    rec_domains: (n) => `🌐 ${n} دامنهٔ اختصاصی دوباره وصل شد.`,
+    rec_lost_secrets: (names) =>
+      `⚠️ این سکرت‌های اضافه منتقل نشدند و باید دستی دوباره اضافه شوند: <code>${names}</code>`,
 
     btn_support: "حمایت مالی",
     support_title: "❤️ <b>حمایت مالی</b>\n\nنوا رایگان است و همیشه رایگان می‌ماند. اگر برایت مفید بوده، می‌توانی از پروژه حمایت کنی:",

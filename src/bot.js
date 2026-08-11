@@ -12,6 +12,7 @@ import { getPanelAdminIds } from "./admin_2fa.js";
 import { aiEnabled, autoAnswer } from "./ai.js";
 import { install, TOKEN_DEEPLINK, UPDATE_TOKEN_DEEPLINK, extractToken } from "./install.js";
 import { startUpdate, runUpdate, loadUpdCtx, clearUpdCtx } from "./update.js";
+import { startRecover, confirmRecover, doRecover } from "./recover.js";
 import { t, normLang } from "./i18n.js";
 import { gatherUserCard } from "./userinfo.js";
 import { sendToProduct, moveCardToProduct, TOPICS } from "./topics.js";
@@ -46,6 +47,22 @@ export async function syncBotProfile(env, { force = false } = {}) {
   }
   await setConfig(env, "profile_sync", PROFILE_SYNC_VER);
   return { ok: true, version: PROFILE_SYNC_VER, results };
+}
+
+/* Arm exactly one token-paste flow.
+ *
+ * Three flows all end with the user pasting the same kind of Cloudflare token,
+ * and which one runs is decided by a flag. Setting one flag without clearing the
+ * other two means a flag left over from a screen the user wandered away from
+ * silently hijacks the next token they paste, and the failure is invisible: they
+ * asked to install and got a recovery, or worse. Setting them together in one
+ * place is the only version of this that stays correct as flows are added.
+ */
+const TOKEN_FLOWS = { install: "await_token", update: "await_utoken", recover: "await_rtoken" };
+async function armTokenFlow(env, userId, flow) {
+  for (const [name, key] of Object.entries(TOKEN_FLOWS)) {
+    await setConfig(env, `${key}_${userId}`, name === flow ? "1" : "");
+  }
 }
 
 export async function handleUpdate(update, env) {
@@ -105,8 +122,10 @@ export async function handleUpdate(update, env) {
   if (token) {
     await deleteMessage(env, chatId, msg.message_id);
     const wantUpdate = (await getConfig(env, `await_utoken_${from.id}`, "")) === "1";
-    await setConfig(env, `await_token_${from.id}`, "");
-    await setConfig(env, `await_utoken_${from.id}`, "");
+    const wantRecover = (await getConfig(env, `await_rtoken_${from.id}`, "")) === "1";
+    // The token is spent; disarm everything so a second paste cannot re-run it.
+    await armTokenFlow(env, from.id, null);
+    if (wantRecover) return startRecover(env, chatId, token, from.id, lang);
     if (wantUpdate) return startUpdate(env, chatId, token, from.id, lang);
     return install(env, chatId, token, from.id, lang);
   }
@@ -124,7 +143,11 @@ export async function handleUpdate(update, env) {
   // of the menu, so people aren't left wondering why nothing happened.
   const pendingToken = await getConfig(env, `await_token_${from.id}`, "");
   const pendingUpd = await getConfig(env, `await_utoken_${from.id}`, "");
-  if ((pendingToken === "1" || pendingUpd === "1") && !isCommand) {
+  // Recovery too: someone mid-rescue who mistypes deserves the same "that is
+  // not a token" answer as everyone else, not a menu that looks like it ignored
+  // them at the exact moment their panel is down.
+  const pendingRec = await getConfig(env, `await_rtoken_${from.id}`, "");
+  if ((pendingToken === "1" || pendingUpd === "1" || pendingRec === "1") && !isCommand) {
     await deleteMessage(env, chatId, msg.message_id);
     return send(env, chatId, t(lang, "not_a_token"), { reply_markup: installKeyboard(lang, true) });
   }
@@ -133,13 +156,11 @@ export async function handleUpdate(update, env) {
     case "/start": {
       const startPayload = (text.split(/\s+/)[1] || "").toLowerCase();
       if (startPayload === "update") {
-        await setConfig(env, `await_utoken_${from.id}`, "1");
-        await setConfig(env, `await_token_${from.id}`, "");
+        await armTokenFlow(env, from.id, "update");
         return send(env, chatId, t(lang, "upd_text"), { reply_markup: updateKeyboard(lang) });
       }
       if (startPayload === "install" || startPayload === "setup") {
-        await setConfig(env, `await_token_${from.id}`, "1");
-        await setConfig(env, `await_utoken_${from.id}`, "");
+        await armTokenFlow(env, from.id, "install");
         return send(env, chatId, t(lang, "install_text"), { reply_markup: installKeyboard(lang, true) });
       }
       return sendMenu(env, chatId, from, lang);
@@ -148,13 +169,18 @@ export async function handleUpdate(update, env) {
     case "/help":
       return sendMenu(env, chatId, from, lang);
     case "/install":
-      await setConfig(env, `await_token_${from.id}`, "1");
-      await setConfig(env, `await_utoken_${from.id}`, "");
+      await armTokenFlow(env, from.id, "install");
       return send(env, chatId, t(lang, "install_text"), { reply_markup: installKeyboard(lang, true) });
     case "/update":
-      await setConfig(env, `await_utoken_${from.id}`, "1");
-      await setConfig(env, `await_token_${from.id}`, "");
+      await armTokenFlow(env, from.id, "update");
       return send(env, chatId, t(lang, "upd_text"), { reply_markup: updateKeyboard(lang) });
+    /* The 1101 rescue. Kept as a command as well as a button because people
+     * were told "/recover" by support and will type it long after the menu has
+     * changed shape. */
+    case "/recover":
+    case "/fix":
+      await armTokenFlow(env, from.id, "recover");
+      return send(env, chatId, t(lang, "rec_text"), { reply_markup: recoverKeyboard(lang) });
     case "/lang":
       return toggleLang(env, chatId, from.id, lang, null);
     case "/id":
@@ -644,20 +670,26 @@ async function handleCallback(cb, env) {
    * the words of a message written by someone who is already stuck. */
   if (data === "install") {
     await setConfig(env, `flow_${cb.from.id}`, "proxy");
-    await setConfig(env, `await_token_${cb.from.id}`, "1");
-    await setConfig(env, `await_utoken_${cb.from.id}`, "");
+    await armTokenFlow(env, cb.from.id, "install");
     return showView(env, chatId, msgId, t(lang, "install_text"), { reply_markup: installKeyboard(lang, true) });
   }
   if (data === "update") {
-    await setConfig(env, `await_utoken_${cb.from.id}`, "1");
-    await setConfig(env, `await_token_${cb.from.id}`, "");
+    await armTokenFlow(env, cb.from.id, "update");
     return showView(env, chatId, msgId, t(lang, "upd_text"), { reply_markup: updateKeyboard(lang) });
+  }
+  if (data === "recover") {
+    await armTokenFlow(env, cb.from.id, "recover");
+    return showView(env, chatId, msgId, t(lang, "rec_text"), { reply_markup: recoverKeyboard(lang) });
   }
   if (data === "updx") {
     await clearUpdCtx(env, cb.from.id);
-    await setConfig(env, `await_utoken_${cb.from.id}`, "");
+    await armTokenFlow(env, cb.from.id, null);
     return replaceWithMenu(env, chatId, msgId, cb.from, lang);
   }
+  // Pick a panel, then confirm, then rebuild. The confirmation is not optional:
+  // this is the one user-facing action in the bot that deletes something.
+  if (data.startsWith("recp:")) return confirmRecover(env, chatId, msgId, cb.from.id, +data.slice(5), lang);
+  if (data.startsWith("recgo:")) return doRecover(env, chatId, msgId, cb.from.id, +data.slice(6), lang);
   if (data.startsWith("updp:")) {
     const i = +data.slice(5);
     const ctx = await loadUpdCtx(env, cb.from.id);
@@ -683,8 +715,7 @@ async function handleCallback(cb, env) {
   if (data === "dep_panel") {
     await setConfig(env, `flow_${cb.from.id}`, "proxy");
     // Same as Install: arm the token-paste state so a pasted token builds the panel.
-    await setConfig(env, `await_token_${cb.from.id}`, "1");
-    await setConfig(env, `await_utoken_${cb.from.id}`, "");
+    await armTokenFlow(env, cb.from.id, "install");
     return showView(env, chatId, msgId, t(lang, "deploy_panel_text"), { reply_markup: depPanelKeyboard(lang) });
   }
   if (data === "dep_vps") await setConfig(env, `flow_${cb.from.id}`, "server");
@@ -730,6 +761,16 @@ function installKeyboard(lang, withBack) {
 // ── Update panel intro ──────────────────────────────────────────────────────
 
 function updateKeyboard(lang) {
+  return { inline_keyboard: [
+    [{ text: t(lang, "btn_get_token"), url: UPDATE_TOKEN_DEEPLINK, style: "primary" }],
+    // Someone whose panel answers 1101 comes here first and finds that Update
+    // does not fix it, so the way out is offered where they already are.
+    [{ text: t(lang, "btn_recover"), callback_data: "recover" }],
+    backRow(lang),
+  ] };
+}
+
+function recoverKeyboard(lang) {
   return { inline_keyboard: [
     [{ text: t(lang, "btn_get_token"), url: UPDATE_TOKEN_DEEPLINK, style: "primary" }],
     backRow(lang),

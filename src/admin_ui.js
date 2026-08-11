@@ -831,6 +831,10 @@ var GUIDE={en:[
   'Tap <b>Reply</b> on a question to write an answer. It is delivered to the user in the bot, in their language, and saved so the AI can learn from it.',
   'When the AI is on it may attach a <b>draft</b>. <b>Send draft</b> delivers it as written; <b>Edit and send</b> opens it so you can fix it first. A draft the model was unsure about is marked, so read those before sending.',
   'Answering here or in your admin group both clear the question from this list.']},
+ {h:'🩺 Error 1101, rebuilding a stuck panel',intro:'A Cloudflare Worker slot can jam so that every page of a panel answers <b>error 1101</b>, whatever code is on it. Re-uploading does not clear it, which is why 🔄 Update never fixes this one and why users report it as "the panel is dead".',s:[
+  'Tell them to open the bot and use <b>🩺 Fix a broken panel</b>, on the Update screen, or to send <b>/recover</b>. They paste the same Cloudflare token they use for updates.',
+  'The bot deletes the Worker and immediately creates it again with the <b>same name</b>, the <b>same database</b> and the latest Nova code. Their users, subscriptions and settings are untouched, and every subscription link already handed out keeps working because the address does not change.',
+  'It is offline for a few seconds. If the rebuild ever fails halfway, the bot says so and states plainly that the database was not touched, so nothing is lost and they can simply run it again.']},
  {h:'💡 Ideas, what users keep asking for',intro:'In your admin group every forwarded message carries a <b>💡 Suggestion</b> button. Tap it when someone is not reporting a problem but asking for something, and the message lands in the <b>Ideas</b> tab instead of sitting in the queue.',s:[
   'Tapping 💡 also clears the message from <b>Waiting</b>, so an idea does not keep looking like an unanswered question. The card keeps its Reply button, so you can still tell the user you noted it.',
   '<b>Done</b> marks an idea as shipped. It stays in the list rather than disappearing: it is the record of what your users asked for and what you built for them. <b>Reopen</b> puts it back.',
@@ -900,6 +904,10 @@ fa:[
   'روی <b>پاسخ</b> یک سؤال بزن و جواب را بنویس. به زبان کاربر در ربات تحویل می‌شود و ذخیره می‌شود تا هوش مصنوعی از آن یاد بگیرد.',
   'وقتی هوش مصنوعی روشن است ممکن است یک <b>پیش‌نویس</b> بچسباند. <b>ارسال پیش‌نویس</b> همان‌طور که هست می‌فرستد؛ <b>ویرایش و ارسال</b> بازش می‌کند تا اول اصلاحش کنی. پیش‌نویسی که مدل مطمئن نبوده علامت دارد، آن‌ها را قبل از ارسال بخوان.',
   'جواب‌دادن اینجا یا در گروه ادمین، هر دو سؤال را از این لیست پاک می‌کنند.']},
+ {h:'🩺 خطای 1101، ساخت دوبارهٔ پنل گیرکرده',intro:'گاهی جایگاه ورکر کلودفلر طوری گیر می‌کند که هر صفحهٔ پنل <b>خطای 1101</b> می‌دهد، هر کدی هم که رویش باشد. آپلود دوباره بازش نمی‌کند، برای همین 🔄 به‌روزرسانی این یکی را درست نمی‌کند و کاربر گزارش می‌دهد «پنل مرده».',s:[
+  'به کاربر بگو ربات را باز کند و از <b>🩺 تعمیر پنل خراب</b> در صفحهٔ به‌روزرسانی استفاده کند، یا <b>/recover</b> بفرستد. همان توکن کلودفلری را می‌فرستد که برای به‌روزرسانی می‌فرستد.',
+  'ربات ورکر را حذف می‌کند و بلافاصله با <b>همان نام</b>، <b>همان دیتابیس</b> و آخرین کد نوا دوباره می‌سازد. کاربران، اشتراک‌ها و تنظیماتشان دست‌نخورده می‌ماند و چون آدرس عوض نمی‌شود، همهٔ لینک‌های اشتراکی که قبلاً داده‌اند کار می‌کنند.',
+  'چند ثانیه از دسترس خارج است. اگر ساخت دوباره نیمه‌کاره شکست بخورد، ربات همان‌جا می‌گوید و صریح می‌نویسد که دیتابیس دست نخورده، پس چیزی از دست نرفته و می‌شود دوباره اجرا کرد.']},
  {h:'💡 ایده‌ها، چیزی که کاربران مدام می‌خواهند',intro:'در گروه ادمین، زیر هر پیام فوروارد‌شده دکمهٔ <b>💡 پیشنهاد</b> هست. وقتی کسی مشکل گزارش نمی‌کند و چیزی می‌خواهد آن را بزنید تا پیام به‌جای ماندن در صف، در تب <b>ایده‌ها</b> بنشیند.',s:[
   'زدن 💡 پیام را از <b>در انتظار</b> هم پاک می‌کند تا یک ایده مثل سؤال بی‌جواب به نظر نرسد. دکمهٔ پاسخ روی کارت می‌ماند تا بتوانید به کاربر بگویید ثبت شد.',
   '<b>انجام شد</b> یعنی ایده ساخته شده. از فهرست حذف نمی‌شود: همین فهرست سند این است که کاربران چه خواستند و شما چه ساختید. <b>بازکردن دوباره</b> آن را برمی‌گرداند.',

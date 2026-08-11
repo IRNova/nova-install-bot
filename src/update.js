@@ -146,9 +146,15 @@ function workerLabel(worker, showAccount) {
   return showAccount && worker.c ? `${worker.n} · ${worker.c}` : worker.n;
 }
 
-// Verify a one-time token, enumerate accessible accounts, and only offer
-// Workers that have Nova's required D1 binding named DB.
-export async function startUpdate(env, chatId, token, userId, lang) {
+/* Verify a one-time token, enumerate accessible accounts, and keep only the
+ * Workers that carry Nova's required D1 binding named DB.
+ *
+ * Shared with /recover, which needs exactly the same discovery and exactly the
+ * same encrypted, short-lived token handling; the only thing that differs is
+ * what the buttons do with the worker the user picks. Returns null when it has
+ * already told the user why it could not continue.
+ */
+export async function discoverNovaWorkers(env, chatId, token, userId, lang) {
   try {
     const verified = await cf("GET", "/user/tokens/verify", token);
     if (!cfOk(verified)) {
@@ -201,27 +207,39 @@ export async function startUpdate(env, chatId, token, userId, lang) {
           settingsChecked >= MAX_SETTINGS_CHECKS) break;
     }
 
-    if (!candidates.length) return send(env, chatId, t(lang, "upd_none_verified"));
+    if (!candidates.length) {
+      await send(env, chatId, t(lang, "upd_none_verified"));
+      return null;
+    }
     await saveUpdCtx(env, chatId, userId, token, candidates);
     token = "";
-
-    const showAccount = accounts.length > 1;
-    const rows = candidates.map((worker, i) => [{
-      text: workerLabel(worker, showAccount),
-      callback_data: `updp:${i}`,
-    }]);
-    rows.push([{ text: t(lang, "btn_upd_cancel"), callback_data: "updx" }]);
-    return send(env, chatId, t(lang, "upd_pick"), {
-      reply_markup: { inline_keyboard: rows },
-    });
+    return { candidates, showAccount: accounts.length > 1 };
   } catch (error) {
-    return send(
+    await send(
       env, chatId,
       `${t(lang, "upd_fail")}: <i>${esc((error && error.message) || "unknown error")}</i>`,
     );
+    return null;
   } finally {
     token = "";
   }
+}
+
+/** The picker, shared by both flows; `prefix` decides what a choice does. */
+export function workerPicker(found, prefix, lang, title) {
+  const rows = found.candidates.map((worker, i) => [{
+    text: workerLabel(worker, found.showAccount),
+    callback_data: `${prefix}:${i}`,
+  }]);
+  rows.push([{ text: t(lang, "btn_upd_cancel"), callback_data: "updx" }]);
+  return { text: title, extra: { reply_markup: { inline_keyboard: rows } } };
+}
+
+export async function startUpdate(env, chatId, token, userId, lang) {
+  const found = await discoverNovaWorkers(env, chatId, token, userId, lang);
+  if (!found) return;
+  const pick = workerPicker(found, "updp", lang, t(lang, "upd_pick"));
+  return send(env, chatId, pick.text, pick.extra);
 }
 
 // Fetch the verified artifact, inherit the exact current binding names, upload
