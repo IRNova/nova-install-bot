@@ -227,9 +227,9 @@ export async function handleUpdate(update, env) {
 // paired half-width utility rows, red Support us as the closing row.
 async function menuMarkup(env, lang) {
   const rows = [
-    [{ text: t(lang, "btn_install"), callback_data: "install", style: "success" }],
-    [{ text: t(lang, "btn_update"), callback_data: "update", style: "primary" }],
-    [{ text: t(lang, "btn_deploy"), callback_data: "deploy" }],
+    [{ text: t(lang, "btn_install"), callback_data: "install", style: "success", icon_custom_emoji_id: ICON.build }],
+    [{ text: t(lang, "btn_update"), callback_data: "update", style: "primary", icon_custom_emoji_id: ICON.manage }],
+    [{ text: t(lang, "btn_deploy"), callback_data: "deploy", icon_custom_emoji_id: ICON.nova }],
     /* Nova Server, at the top level rather than only three taps down inside the
      * deploy hub. It is a whole product and the people who want it arrive
      * already knowing they do, so making them browse for it costs installs. It
@@ -238,12 +238,12 @@ async function menuMarkup(env, lang) {
      * from "FAQ". Telegram gives exactly three button colours, so they only work
      * by scarcity: three coloured rows out of eleven reads as a hierarchy, eight
      * would read as noise. */
-    [{ text: t(lang, "btn_vps"), callback_data: "dep_vps", style: "primary" }],
+    [{ text: t(lang, "btn_vps"), callback_data: "dep_vps", style: "primary", icon_custom_emoji_id: ICON.server }],
   ];
   for (const s of await listSections(env)) rows.push([{ text: s.title, callback_data: `sec:${s.id}` }]);
   const appsBtn = { text: t(lang, "btn_apps"), callback_data: "apps" };
   const faqOn = (await getConfig(env, "faq_enabled", "1")) === "1" && (await listFaq(env)).length > 0;
-  rows.push(faqOn ? [appsBtn, { text: t(lang, "btn_faq"), callback_data: "faq" }] : [appsBtn]);
+  rows.push(faqOn ? [appsBtn, { text: t(lang, "btn_faq"), callback_data: "faq", icon_custom_emoji_id: ICON.help }] : [appsBtn]);
   const ghBtn = { text: t(lang, "btn_github"), url: "https://github.com/IRNova/Nova-Proxy" };
   if ((await getConfig(env, "contact_enabled", "1")) === "1") {
     rows.push([{ text: t(lang, "btn_contact"), callback_data: "contact" }, ghBtn]);
@@ -252,14 +252,14 @@ async function menuMarkup(env, lang) {
   }
   // Where to follow us. The bot is the surface with the most users by a wide
   // margin and was the only one carrying none of these.
-  rows.push([{ text: t(lang, "btn_socials"), callback_data: "socials" }]);
+  rows.push([{ text: t(lang, "btn_socials"), callback_data: "socials", icon_custom_emoji_id: ICON.follow }]);
   rows.push([{ text: t(lang, "btn_lang"), callback_data: "lang" }]);
   /* NOT `danger`. Red is Telegram's destructive style, and this bot uses that
    * same red for "Block / مسدود" in the admin flow. A donate button wearing the
    * ban colour is both alarming and a waste of the one style that should mean
    * "this cannot be undone". It keeps its prominence from being the last row and
    * from the heart. */
-  rows.push([{ text: t(lang, "btn_support"), callback_data: "support" }]);
+  rows.push([{ text: t(lang, "btn_support"), callback_data: "support", icon_custom_emoji_id: ICON.heart }]);
   return { inline_keyboard: rows };
 }
 
@@ -348,6 +348,30 @@ function backRow(lang) {
  * The GitHub link is Nova-PROXY specifically, not a generic "our GitHub". Nova
  * Server is closed by design, and pointing at the org invites people to go
  * looking for source that is deliberately not there. */
+/* Nova's own emoji, shown before the button text via `icon_custom_emoji_id`.
+ *
+ * Telegram allows exactly three button colours (danger, success, primary), so
+ * this is the only way to put the BRAND on a keyboard. The ids come from
+ * t.me/addemoji/NovaProxy and are stable for the life of that pack; read them
+ * again with `/emojiid NovaProxy` if the pack is ever rebuilt.
+ *
+ * Rendered only while the bot owner holds Telegram Premium, or if the bot has
+ * Fragment usernames. When neither holds, Telegram ignores the field: the button
+ * keeps its text and its ordinary emoji prefix, so this degrades to exactly what
+ * shipped before rather than to a blank button. That is why every label below
+ * still starts with a normal emoji.
+ */
+const ICON = {
+  shield: "5177354342549686013",
+  server: "5177167867954596435",
+  nova:   "5174670245687723771",
+  manage: "5177049906677811482",
+  help:   "5176992096418006835",
+  heart:  "5177098487052895967",
+  follow: "5174750802094327829",
+  build:  "5177351022539966619",
+};
+
 const SOCIALS = [
   { key: "soc_tg", url: "https://t.me/irnova_proxy" },
   { key: "soc_ig", url: "https://instagram.com/irnova_proxy" },
