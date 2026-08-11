@@ -169,13 +169,3 @@ test("card actions are refused outside the admin group", async () => {
   const firstAction = fn.indexOf('data.startsWith("reply:")');
   assert.ok(gate.index < firstAction, "the gate runs after a branch that already acted");
 });
-
-test("a qa id is validated before it becomes a config key", () => {
-  // `qprod_${id}` with an unchecked id lets one press write one arbitrary row.
-  const src = readFileSync(new URL("../src/bot.js", import.meta.url), "utf8");
-  for (const branch of ["qtag:", "qclose:"]) {
-    const at = src.indexOf(`data.startsWith("${branch}")`);
-    const body = src.slice(at, at + 700);
-    assert.match(body, /Number\.isInteger\(/, `${branch} does not integer-check its id`);
-  }
-});

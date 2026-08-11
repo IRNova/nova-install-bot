@@ -186,13 +186,15 @@ export async function setQaSource(env, qaId, source) {
  * both worth less than not storing them. */
 export async function pruneProductHints(env) {
   const tags = await env.DB.prepare(
-    "DELETE FROM config WHERE key LIKE 'qprod_%' " +
+    "DELETE FROM config WHERE key LIKE 'qprod\\_%' ESCAPE '\\' " +
+    "AND substr(key, 7) GLOB '[0-9]*' " +
     "AND CAST(substr(key, 7) AS INTEGER) IN " +
     "(SELECT id FROM qa_log WHERE answer IS NOT NULL AND answer != '' " +
     " AND answered_at < datetime('now','-30 day'))"
   ).run().catch(() => null);
   const flows = await env.DB.prepare(
-    "DELETE FROM config WHERE key LIKE 'flow_%' " +
+    "DELETE FROM config WHERE key LIKE 'flow\\_%' ESCAPE '\\' " +
+    "AND substr(key, 6) GLOB '[0-9]*' " +
     "AND CAST(substr(key, 6) AS INTEGER) IN " +
     "(SELECT id FROM users WHERE last_seen < datetime('now','-30 day'))"
   ).run().catch(() => null);
@@ -211,11 +213,10 @@ export async function pruneProductHints(env) {
     "WHERE (key LIKE 'await\\_%' ESCAPE '\\' OR key LIKE 'member\\_%' ESCAPE '\\') " +
     "AND (value IS NULL OR value = '') LIMIT 5000)"
   ).run().catch(() => null);
-  return {
-    tags: (tags && tags.meta && tags.meta.changes) || 0,
-    flows: (flows && flows.meta && flows.meta.changes) || 0,
-    dead: (dead && dead.meta && dead.meta.changes) || 0,
-  };
+  // null, not 0, when a statement failed: in the cron log a statement that threw
+  // every night and a statement with nothing to do must not read the same.
+  const changed = (r) => (r && r.meta ? r.meta.changes || 0 : null);
+  return { tags: changed(tags), flows: changed(flows), dead: changed(dead) };
 }
 
 /** Questions an admin flagged as a product suggestion, newest first. */

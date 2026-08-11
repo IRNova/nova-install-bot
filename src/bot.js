@@ -429,8 +429,12 @@ async function handleCallback(cb, env) {
    * a new card action is added. It was: qclose, qsugg and qtag shipped without
    * it, which let any of the 26k users close every open support question in a
    * loop, and read other users' ids out of the keyboard the bot built back. */
+  // Declared outside the block because the branches below still use it: `const`
+  // inside the `if` would scope it to the gate and leave `reply:` referencing
+  // a name that no longer exists.
+  let group = "";
   if (/^(reply|dok|qclose|qsugg|qtag|ban|unban):/.test(data)) {
-    const group = await getConfig(env, "contact_group_id", "");
+    group = await getConfig(env, "contact_group_id", "");
     if (!group || String(chatId) !== String(group)) return answerCb(env, cb.id);
   }
 
@@ -497,8 +501,11 @@ async function handleCallback(cb, env) {
    * untouched while a row quietly changed in the database. */
   if (data.startsWith("qclose:") || data.startsWith("qsugg:")) {
     const closing = data.startsWith("qclose:");
-    const qaId = Number(data.slice(closing ? 7 : 6));
-    if (!Number.isInteger(qaId) || qaId <= 0) return answerCb(env, cb.id);
+    const rawId = data.slice(closing ? 7 : 6);
+    // Digits only. `Number.isInteger` would wave through "99999999999999999999"
+    // as 1e20, and anything past 1e21 stringifies back as "1e+21".
+    if (!/^\d{1,15}$/.test(rawId)) return answerCb(env, cb.id);
+    const qaId = Number(rawId);
     await setQaSource(env, qaId, closing ? "closed" : "suggestion").catch(() => {});
     const who = cb.from.first_name || "admin";
     const note = closing
@@ -521,8 +528,8 @@ async function handleCallback(cb, env) {
     const [, rawId, want] = data.split(":");
     // The id becomes part of a config key, so it has to be a number before it is
     // interpolated, not after. Otherwise every press writes a new arbitrary row.
+    if (!/^\d{1,15}$/.test(rawId)) return answerCb(env, cb.id);
     const id = Number(rawId);
-    if (!Number.isInteger(id) || id <= 0) return answerCb(env, cb.id);
     const product = PRODUCTS[want] ? want : "proxy";
     await setConfig(env, `qprod_${id}`, product);
     /* Teach the inference from the correction: the next question from this user
@@ -945,7 +952,7 @@ function cardBody(message) {
 
 async function appendToCard(env, chatId, msgId, message, note, kb) {
   const { text, entities } = cardBody(message);
-  return editCard(env, chatId, msgId, text + note, entities, kb);
+  return editCard(env, chatId, msgId, message, text + note, entities, kb);
 }
 
 /* Swapping the product chip. Same length in code units either way (both tags are
@@ -962,7 +969,7 @@ async function retagCard(env, chatId, msgId, message, product) {
   const delta = to.length - from.length;
   const shifted = delta === 0 ? entities : entities.map((e) =>
     e.offset > at ? { ...e, offset: e.offset + delta } : e);
-  return editCard(env, chatId, msgId, text.slice(0, at) + to + text.slice(at + from.length), shifted, null);
+  return editCard(env, chatId, msgId, message, text.slice(0, at) + to + text.slice(at + from.length), shifted, null);
 }
 
 async function cardKbFor(env, groupMsgId, userId, banned, replied) {
