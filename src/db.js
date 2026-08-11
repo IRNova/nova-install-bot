@@ -137,6 +137,103 @@ export async function markQaResolved(env, qaId) {
   await env.DB.prepare("UPDATE qa_log SET resolved = 1 WHERE id = ?").bind(qaId).run();
 }
 
+/* Close and Suggestion, written the way the live database already records them.
+ *
+ * These two admin actions were lost when a deploy went out from a repo that did
+ * not have them, but the ROWS survived: 198 `closed` and 44 `suggestion` at the
+ * time of rebuilding. `source` is the column that carries it, so these keep
+ * writing exactly those values and the existing rows stay part of the same set
+ * rather than becoming orphans under some new flag.
+ *
+ * `source` doubles as "how was this handled", which is why a close is not simply
+ * `resolved = 1`: resolved means the USER said it was solved, closed means an
+ * admin decided it needed no reply.
+ */
+/* The Waiting inbox selects on `answer`, not on `source`, so a row that only
+ * changes source stays in the queue and Close closes nothing. The 244 rows
+ * already tagged this way carry a sentinel answer for exactly that reason, and
+ * these are the strings they carry, kept byte-for-byte so the old rows and the
+ * new ones remain one set. Only set it on a first close: overwriting a real
+ * answer with a sentinel would destroy the reply the user was sent. */
+export const QA_MARK = {
+  closed: "🚫 Closed / بسته‌شده",
+  suggestion: "💡 Suggestion / پیشنهاد",
+  suggestion_done: "💡 Suggestion / پیشنهاد",
+};
+
+export async function setQaSource(env, qaId, source) {
+  if (!qaId) return;
+  const mark = QA_MARK[source];
+  if (!mark) {
+    await env.DB.prepare("UPDATE qa_log SET source = ? WHERE id = ?").bind(source, qaId).run();
+    return;
+  }
+  await env.DB.prepare(
+    "UPDATE qa_log SET source = ?, " +
+    "answer = CASE WHEN answer IS NULL OR answer = '' THEN ? ELSE answer END, " +
+    "answered_at = COALESCE(answered_at, datetime('now')) WHERE id = ?"
+  ).bind(source, mark, qaId).run();
+}
+
+/* The product tag keeps two per-user rows in `config`: `flow_<userId>` (which
+ * product flow they last opened) and `qprod_<qaId>` (the tag on one card). Both
+ * are hints, not records, and `config` otherwise holds a few dozen settings, so
+ * without a sweep the settings table quietly turns into a 26k-row activity log
+ * sitting next to the panel's own keys.
+ *
+ * Kept: every tag whose question is still open, and the last 30 days of flows.
+ * A tag on a question nobody will reopen, and a flow older than a month, are
+ * both worth less than not storing them. */
+export async function pruneProductHints(env) {
+  const tags = await env.DB.prepare(
+    "DELETE FROM config WHERE key LIKE 'qprod_%' " +
+    "AND CAST(substr(key, 7) AS INTEGER) IN " +
+    "(SELECT id FROM qa_log WHERE answer IS NOT NULL AND answer != '' " +
+    " AND answered_at < datetime('now','-30 day'))"
+  ).run().catch(() => null);
+  const flows = await env.DB.prepare(
+    "DELETE FROM config WHERE key LIKE 'flow_%' " +
+    "AND CAST(substr(key, 6) AS INTEGER) IN " +
+    "(SELECT id FROM users WHERE last_seen < datetime('now','-30 day'))"
+  ).run().catch(() => null);
+  /* While here: the per-user state keys that predate this one are cleared by
+   * writing "" rather than deleting the row, so `config` was carrying 41k rows
+   * that hold no state at all. Every reader of `await_*` and `member_*` passes
+   * "" as its fallback (bot.js:106,115,124,125,282), so for those keys a cleared
+   * row and a missing row are already indistinguishable, which is what makes
+   * dropping them safe rather than merely tidy. */
+  /* Capped per run, and converging: there are 41k of these on the live database
+   * and one statement that touches all of them is a statement that can time out
+   * and then delete nothing, every night, forever. 5k a night clears the backlog
+   * in under two weeks and stays well inside a cron tick after that. */
+  const dead = await env.DB.prepare(
+    "DELETE FROM config WHERE rowid IN (SELECT rowid FROM config " +
+    "WHERE (key LIKE 'await\\_%' ESCAPE '\\' OR key LIKE 'member\\_%' ESCAPE '\\') " +
+    "AND (value IS NULL OR value = '') LIMIT 5000)"
+  ).run().catch(() => null);
+  return {
+    tags: (tags && tags.meta && tags.meta.changes) || 0,
+    flows: (flows && flows.meta && flows.meta.changes) || 0,
+    dead: (dead && dead.meta && dead.meta.changes) || 0,
+  };
+}
+
+/** Questions an admin flagged as a product suggestion, newest first. */
+export async function listSuggestions(env, limit = 100) {
+  const r = await env.DB.prepare(
+    "SELECT id, user_id, lang, question, source, created_at FROM qa_log " +
+    "WHERE source IN ('suggestion','suggestion_done') ORDER BY id DESC LIMIT ?"
+  ).bind(limit).all();
+  return r.results || [];
+}
+
+export async function countSuggestions(env) {
+  const r = await env.DB.prepare(
+    "SELECT COUNT(*) n FROM qa_log WHERE source = 'suggestion'"
+  ).first();
+  return (r && r.n) || 0;
+}
+
 // ── AI spend ────────────────────────────────────────────────────────────────
 
 // Neurons are not reported per call, so we estimate from tokens, which are.

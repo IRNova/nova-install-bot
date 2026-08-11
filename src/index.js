@@ -12,6 +12,7 @@ import { handleAdmin } from "./admin.js";
 import { BANNER_JPEG_B64 } from "./banner.js";
 import { autoAnswer } from "./ai.js";
 import { pruneExpiredUpdateSessions } from "./update.js";
+import { pruneProductHints } from "./db.js";
 
 // Constant-time string compare, so matching a secret doesn't leak its length/prefix
 // through response timing. Length mismatch still returns false, but without an early
@@ -146,6 +147,11 @@ export default {
       }),
       pruneExpiredUpdateSessions(env).catch((e) => {
         console.error("update-session cleanup error:", e && e.stack || e);
+      }),
+      pruneProductHints(env).then((r) => {
+        console.log("product-hint prune:", JSON.stringify(r));
+      }).catch((e) => {
+        console.error("product-hint prune error:", e && e.stack || e);
       }),
     ]));
   },

@@ -460,6 +460,7 @@ export const DASHBOARD_HTML = HEAD("Nova Bot Admin") + `<body>${THEME_BOOT}
   <nav class="nav">
    <button class="nav-item on" data-p="stats" onclick="nav(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="8"/><rect x="12" y="6" width="3" height="12"/><rect x="17" y="13" width="3" height="5"/></svg><span data-k="stats">Overview</span></button>
    <button class="nav-item" data-p="inbox" onclick="nav(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5.45 5.11 2 12v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-6l-3.45-6.89A2 2 0 0 0 16.76 4H7.24a2 2 0 0 0-1.79 1.11z"/></svg><span data-k="inbox">Waiting</span><span class="nav-badge hidden" id="inboxbadge">0</span></button>
+   <button class="nav-item" data-p="ideas" onclick="nav(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg><span data-k="ideas">Ideas</span><span class="nav-badge hidden" id="ideabadge">0</span></button>
    <button class="nav-item" data-p="faq" onclick="nav(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><line x1="12" y1="17" x2="12" y2="17"/></svg><span data-k="faq">FAQ</span></button>
    <button class="nav-item" data-p="sections" onclick="nav(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg><span data-k="sections">Sections</span></button>
    <button class="nav-item" data-p="users" onclick="nav(this)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span data-k="users">Users</span></button>
@@ -525,6 +526,15 @@ export const DASHBOARD_HTML = HEAD("Nova Bot Admin") + `<body>${THEME_BOOT}
     <button class="btn ghost sm" id="inboxrefresh" onclick="loadInbox()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg><span data-k="ov_refresh">Refresh</span></button>
    </div>
    <div class="card"><div id="inboxfeed"></div></div>
+  </div>
+
+  <!-- IDEAS (💡 tagged in the Telegram group) -->
+  <div class="pane" data-pane="ideas">
+   <div class="ovbar">
+    <span class="muted" id="ideaupd"></span>
+    <button class="btn ghost sm" id="idearefresh" onclick="loadIdeas()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg><span data-k="ov_refresh">Refresh</span></button>
+   </div>
+   <div class="card"><div id="ideafeed"></div></div>
   </div>
 
   <!-- FAQ -->
@@ -693,6 +703,9 @@ export const DASHBOARD_HTML = HEAD("Nova Bot Admin") + `<body>${THEME_BOOT}
 var I={en:{manage:'Manage',help:'Help',guide:'Guide',stats:'Overview',inbox:'Waiting',faq:'FAQ',sections:'Sections',users:'Users',settings:'Settings',broadcast:'Broadcast',theme:'Theme',
  logout:'Log out',menu:'Menu',skip:'Skip to content',u_search:'Search name, username or ID',
  ptitle_inbox:'Waiting',psub_inbox:'Questions still needing a reply',
+ ideas:'Ideas',ptitle_ideas:'Ideas',psub_ideas:'What users asked for, tagged 💡 in the group',
+ idea_count:'{n} open',idea_none:'No ideas yet. Tap 💡 on a message in the Telegram group to keep it here.',
+ idea_done:'Done',idea_undo:'Reopen',idea_done_tag:'done',idea_open_tag:'idea',
  inbox_count:'{n} waiting',inbox_none:'Nothing waiting. Every question has been answered.',
  ptitle_stats:'Overview',psub_stats:'How Nova Bot is doing, at a glance',ptitle_faq:'FAQ',psub_faq:'Questions users can browse',
  ptitle_sections:'Menu sections',psub_sections:'Custom buttons on the bot menu',ptitle_settings:'Settings',psub_settings:'Welcome text and contact',
@@ -738,6 +751,9 @@ var I={en:{manage:'Manage',help:'Help',guide:'Guide',stats:'Overview',inbox:'Wai
 fa:{manage:'مدیریت',help:'راهنما',guide:'راهنما',stats:'نمای کلی',inbox:'در انتظار',faq:'سؤالات',sections:'بخش‌ها',users:'کاربران',settings:'تنظیمات',broadcast:'همگانی',theme:'پوسته',
  logout:'خروج',menu:'منو',skip:'پرش به محتوا',u_search:'جست‌وجوی نام، یوزرنیم یا آیدی',
  ptitle_inbox:'در انتظار',psub_inbox:'سؤال‌هایی که هنوز جواب نگرفته‌اند',
+ ideas:'ایده‌ها',ptitle_ideas:'ایده‌ها',psub_ideas:'چیزی که کاربران خواسته‌اند، با 💡 در گروه علامت خورده',
+ idea_count:'{n} باز',idea_none:'هنوز ایده‌ای نیست. در گروه تلگرام روی پیام 💡 بزنید تا اینجا بماند.',
+ idea_done:'انجام شد',idea_undo:'بازکردن دوباره',idea_done_tag:'انجام‌شده',idea_open_tag:'ایده',
  inbox_count:'{n} در انتظار',inbox_none:'چیزی در انتظار نیست. به همه سؤال‌ها جواب داده شده.',
  ptitle_stats:'نمای کلی',psub_stats:'وضعیت ربات در یک نگاه',ptitle_faq:'سؤالات متداول',psub_faq:'سؤال‌هایی که کاربران می‌بینند',
  ptitle_sections:'بخش‌های منو',psub_sections:'دکمه‌های سفارشی منوی ربات',ptitle_settings:'تنظیمات',psub_settings:'متن خوش‌آمد و تماس',
@@ -794,6 +810,13 @@ var GUIDE={en:[
   'Tap <b>Reply</b> on a question to write an answer. It is delivered to the user in the bot, in their language, and saved so the AI can learn from it.',
   'When the AI is on it may attach a <b>draft</b>. <b>Send draft</b> delivers it as written; <b>Edit and send</b> opens it so you can fix it first. A draft the model was unsure about is marked, so read those before sending.',
   'Answering here or in your admin group both clear the question from this list.']},
+ {h:'💡 Ideas, what users keep asking for',intro:'In your admin group every forwarded message carries a <b>💡 Suggestion</b> button. Tap it when someone is not reporting a problem but asking for something, and the message lands in the <b>Ideas</b> tab instead of sitting in the queue.',s:[
+  'Tapping 💡 also clears the message from <b>Waiting</b>, so an idea does not keep looking like an unanswered question. The card keeps its Reply button, so you can still tell the user you noted it.',
+  '<b>Done</b> marks an idea as shipped. It stays in the list rather than disappearing: it is the record of what your users asked for and what you built for them. <b>Reopen</b> puts it back.',
+  'The <b>🗑 Close</b> button next to it is the other case: a message that needs no reply at all. It clears the question without recording anything.']},
+ {h:'🟣 Proxy or 🔵 Server, the tag on every message',intro:'Each forwarded message is tagged with the product the person is asking about, so whoever handles Cloudflare panels and whoever handles VPS nodes can each see at a glance what is theirs.',s:[
+  'The tag is a <b>guess</b>. It comes from the flow the user last opened in the bot, and failing that from the words in their message.',
+  'When the guess is wrong, tap the arrow button under the card to flip it. That also fixes the guess for that user\\'s next message, so a correction only has to be made once.']},
  {h:'🖼️ Replying with a photo',s:[
   'In your admin group, <b>reply to a forwarded message with a photo</b> (a screenshot, a settings picture) and the bot sends that photo to the user.',
   'Add a caption to the photo to send words with it. A photo with no caption is still delivered and the question is marked answered.']},
@@ -853,6 +876,13 @@ fa:[
   'روی <b>پاسخ</b> یک سؤال بزن و جواب را بنویس. به زبان کاربر در ربات تحویل می‌شود و ذخیره می‌شود تا هوش مصنوعی از آن یاد بگیرد.',
   'وقتی هوش مصنوعی روشن است ممکن است یک <b>پیش‌نویس</b> بچسباند. <b>ارسال پیش‌نویس</b> همان‌طور که هست می‌فرستد؛ <b>ویرایش و ارسال</b> بازش می‌کند تا اول اصلاحش کنی. پیش‌نویسی که مدل مطمئن نبوده علامت دارد، آن‌ها را قبل از ارسال بخوان.',
   'جواب‌دادن اینجا یا در گروه ادمین، هر دو سؤال را از این لیست پاک می‌کنند.']},
+ {h:'💡 ایده‌ها، چیزی که کاربران مدام می‌خواهند',intro:'در گروه ادمین، زیر هر پیام فوروارد‌شده دکمهٔ <b>💡 پیشنهاد</b> هست. وقتی کسی مشکل گزارش نمی‌کند و چیزی می‌خواهد آن را بزنید تا پیام به‌جای ماندن در صف، در تب <b>ایده‌ها</b> بنشیند.',s:[
+  'زدن 💡 پیام را از <b>در انتظار</b> هم پاک می‌کند تا یک ایده مثل سؤال بی‌جواب به نظر نرسد. دکمهٔ پاسخ روی کارت می‌ماند تا بتوانید به کاربر بگویید ثبت شد.',
+  '<b>انجام شد</b> یعنی ایده ساخته شده. از فهرست حذف نمی‌شود: همین فهرست سند این است که کاربران چه خواستند و شما چه ساختید. <b>بازکردن دوباره</b> آن را برمی‌گرداند.',
+  'دکمهٔ <b>🗑 بستن</b> کنارش برای حالت دیگری است: پیامی که اصلاً جواب نمی‌خواهد. سؤال را بدون ثبت چیزی پاک می‌کند.']},
+ {h:'🟣 پروکسی یا 🔵 سرور، برچسب روی هر پیام',intro:'هر پیام فوروارد‌شده با نام محصولی که کاربر دربارهٔ آن می‌پرسد برچسب می‌خورد، تا هرکس پنل‌های کلودفلر را می‌چرخاند و هرکس نودهای وی‌پی‌اس را، در یک نگاه سهم خودش را ببیند.',s:[
+  'این برچسب یک <b>حدس</b> است. از مسیری می‌آید که کاربر آخرین‌بار در ربات باز کرده و اگر نبود، از واژه‌های خود پیام.',
+  'وقتی حدس غلط بود، دکمهٔ فلش زیر کارت را بزنید تا برعکس شود. همان زدن، حدسِ پیام بعدیِ همان کاربر را هم درست می‌کند، پس یک‌بار اصلاح کافی است.']},
  {h:'🖼️ پاسخ با عکس',s:[
   'در گروه ادمین، <b>روی پیام فوروارد‌شده با یک عکس ریپلای کن</b> (اسکرین‌شات، تصویر تنظیمات) و ربات همان عکس را برای کاربر می‌فرستد.',
   'اگر روی عکس کپشن بگذاری، متن هم همراهش می‌رود. عکس بدون کپشن هم تحویل می‌شود و سؤال جواب‌داده‌شده علامت می‌خورد.']},
@@ -923,7 +953,10 @@ function applyLang(){document.documentElement.lang=lang;document.documentElement
  [].forEach.call(document.querySelectorAll('#lg button'),function(b){b.classList.toggle('on',b.dataset.l===lang)});
  rerender()}
 function applyTheme(){document.documentElement.setAttribute('data-theme',theme)}
-function rerender(){if(cur==='stats')loadStats();if(cur==='faq')loadFaq();if(cur==='sections')loadSections();if(cur==='users')loadUsers();if(cur==='guide')renderGuide()}
+// Every pane that builds its own rows in JS has to be listed here, or switching
+// language leaves that pane's rows, buttons and counts in the old one. Waiting
+// was missing for the same reason Ideas would have been.
+function rerender(){if(cur==='stats')loadStats();if(cur==='inbox')loadInbox();if(cur==='ideas')loadIdeas();if(cur==='faq')loadFaq();if(cur==='sections')loadSections();if(cur==='users')loadUsers();if(cur==='guide')renderGuide()}
 function renderGuide(){var g=GUIDE[lang]||GUIDE.en;$('guidebox').innerHTML=g.map(function(sec){
  var intro=sec.intro?'<div class="desc">'+sec.intro+'</div>':'';
  var steps=sec.s.map(function(line,i){return '<div class="gstep"><span class="gn">'+nf(i+1)+'</span><span>'+line+'</span></div>'}).join('');
@@ -933,7 +966,7 @@ function renderGuide(){var g=GUIDE[lang]||GUIDE.en;$('guidebox').innerHTML=g.map
 function nav(btn){cur=btn.dataset.p;document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('on'));btn.classList.add('on');
  document.querySelectorAll('.pane').forEach(p=>p.classList.toggle('on',p.dataset.pane===cur));
  $('ptitle').textContent=T('ptitle_'+cur);$('psub').textContent=T('psub_'+cur);$('app').classList.remove('open');
- if(cur==='stats')loadStats();if(cur==='inbox')loadInbox();if(cur==='faq')loadFaq();if(cur==='sections')loadSections();if(cur==='users')loadUsers();if(cur==='settings'){loadConfig();loadOffenders()}if(cur==='guide')renderGuide()}
+ if(cur==='stats')loadStats();if(cur==='inbox')loadInbox();if(cur==='ideas')loadIdeas();if(cur==='faq')loadFaq();if(cur==='sections')loadSections();if(cur==='users')loadUsers();if(cur==='settings'){loadConfig();loadOffenders()}if(cur==='guide')renderGuide()}
 
 $('lg').onclick=function(e){var b=e.target.closest('button');if(b){lang=b.dataset.l;localStorage.setItem('nova-lang',lang);applyLang()}};
 $('theme').onclick=function(){theme=theme==='dark'?'light':'dark';localStorage.setItem('nova-theme',theme);applyTheme()};
@@ -1033,6 +1066,45 @@ async function loadInbox(){
  var loc=lang==='fa'?'fa-IR':'en-US';
  $('inboxupd').textContent=fmt('inbox_count',rows.length);
  $('inboxfeed').innerHTML=!rows.length?emptyBox('inbox_none'):rows.map(qrowHTML).join('');
+}
+
+/* Ideas: the 💡 pile from the Telegram group. Users write feature requests into
+ * support because that is the only door they have, and before this the tag went
+ * into the database and nowhere else. Done is a state, not a delete: a shipped
+ * idea is the evidence you shipped it. */
+async function loadIdeas(){
+ var b=$('idearefresh');if(b)b.disabled=true;
+ var rows=await api('GET','suggestions').catch(function(){return null});
+ if(b)b.disabled=false;
+ if(!rows||rows.error)rows=[];
+ var open=rows.filter(function(r){return r.source==='suggestion'}).length;
+ setIdeaBadge(open);
+ $('ideaupd').textContent=fmt('idea_count',open);
+ $('ideafeed').innerHTML=!rows.length?emptyBox('idea_none'):rows.map(idearowHTML).join('');
+}
+
+function idearowHTML(r){
+ var done=r.source==='suggestion_done';
+ var q=String(r.question||'');if(q.length>240)q=q.slice(0,240)+'…';
+ // A bare 💡 next to the status dot reads as a rendering glitch, so the open
+ // state is named like every other chip in the panel.
+ var chip=done?'<span class="chip ok"><span class="dot"></span>'+T('idea_done_tag')+'</span>'
+              :'<span class="chip"><span class="dot"></span>'+T('idea_open_tag')+'</span>';
+ var btn='<div class="btncol"><button class="btn ghost sm" onclick="ideaDone('+(+r.id)+','+(done?'1':'0')+')">'+
+   T(done?'idea_undo':'idea_done')+'</button></div>';
+ return '<div class="qrow">'+chip+'<div class="body"><div class="qt" dir="auto">'+esc(q)+'</div>'+
+  '<div class="meta"><span>'+esc(String(r.lang||'').toUpperCase())+'</span><span>'+rel(r.created_at)+'</span></div></div>'+
+  btn+'</div>';
+}
+
+async function ideaDone(id,isDone){
+ await api('POST','suggestion-done',{id:id,undo:!!isDone});
+ loadIdeas();
+}
+
+function setIdeaBadge(n){
+ var b=$('ideabadge');if(!b)return;
+ b.textContent=nf(n);b.classList.toggle('hidden',!n);
 }
 
 function setInboxBadge(n){

@@ -214,7 +214,11 @@ const FAQ_SCHEMA = {
 // Draft new FAQ entries from recent real questions. Inserts them DISABLED so
 // the admin reviews and enables them in the panel. Returns the drafts.
 export async function suggestFaqs(env) {
-  const recent = await listAnsweredQa(env, { limit: 100 });
+  /* Only real replies. A closed or 💡-tagged question carries a sentinel answer
+   * ("🚫 Closed / بسته‌شده") so it leaves the Waiting queue, and without this
+   * filter the drafter reads those sentinels as the answers to 200 questions and
+   * writes an FAQ that tells people their question was closed. */
+  const recent = await listAnsweredQa(env, { sources: ["human", "approved", "ai"], limit: 100 });
   if (!recent.length) return [];
   const existing = await listFaq(env, false).catch(() => []);
   const out = await runJson(env, {

@@ -6,7 +6,7 @@ import {
   touchUser, getConfig, setConfig, listFaq, getFaq, listSections, getSection,
   markBlocked, getUserLang, setUserLang, isBanned, setBanned,
   logQuestion, setQaAnswer, setQaAnswerByCard, setQaDraft, markQaResolved, getQa,
-  bumpOffense, setOffenderStatus,
+  bumpOffense, setOffenderStatus, setQaSource, listSuggestions, countSuggestions,
 } from "./db.js";
 import { getPanelAdminIds } from "./admin_2fa.js";
 import { aiEnabled, autoAnswer } from "./ai.js";
@@ -417,11 +417,26 @@ async function handleCallback(cb, env) {
   const chatId = cb.message && cb.message.chat && cb.message.chat.id;
   const msgId = cb.message && cb.message.message_id;
 
+  /* Card actions belong to the admin group and nowhere else.
+   *
+   * `callback_data` is whatever the client sends: a user does not have to be
+   * shown a button to press it, and over raw MTProto the payload is arbitrary
+   * bytes. So the button a card carries proves nothing, and the only thing worth
+   * trusting is which chat the message lives in.
+   *
+   * This is a single gate at the top rather than a copy inside each branch,
+   * because the per-branch version is exactly the check that gets forgotten when
+   * a new card action is added. It was: qclose, qsugg and qtag shipped without
+   * it, which let any of the 26k users close every open support question in a
+   * loop, and read other users' ids out of the keyboard the bot built back. */
+  if (/^(reply|dok|qclose|qsugg|qtag|ban|unban):/.test(data)) {
+    const group = await getConfig(env, "contact_group_id", "");
+    if (!group || String(chatId) !== String(group)) return answerCb(env, cb.id);
+  }
+
   // Reply button on a forwarded message / whois card: pop a reply box for the
   // admin who tapped, mapped back to the same user so their next message relays.
   if (data.startsWith("reply:")) {
-    const group = await getConfig(env, "contact_group_id", "");
-    if (!group || String(chatId) !== String(group)) return answerCb(env, cb.id);
     await answerCb(env, cb.id);
     const targetId = Number(data.split(":")[1]);
     const u = await env.DB.prepare("SELECT first_name, username FROM users WHERE id = ?")
@@ -471,12 +486,63 @@ async function handleCallback(cb, env) {
     const banned = await isBanned(env, qa.user_id).catch(() => false);
     await tg(env, "editMessageReplyMarkup", {
       chat_id: chatId, message_id: msgId,
-      reply_markup: contactKb(qa.user_id, banned, true),
+      reply_markup: await cardKbFor(env, msgId, qa.user_id, banned, true),
     }).catch(() => {});
     return answerCb(env, cb.id, "Draft sent ✅");
   }
 
   // Ban / unban from the admin group (the Block button on a forwarded message).
+  /* Close, Suggestion, and the tag correction. All three edit the card in place
+   * so the group can see what was done and by whom, rather than the card looking
+   * untouched while a row quietly changed in the database. */
+  if (data.startsWith("qclose:") || data.startsWith("qsugg:")) {
+    const closing = data.startsWith("qclose:");
+    const qaId = Number(data.slice(closing ? 7 : 6));
+    if (!Number.isInteger(qaId) || qaId <= 0) return answerCb(env, cb.id);
+    await setQaSource(env, qaId, closing ? "closed" : "suggestion").catch(() => {});
+    const who = cb.from.first_name || "admin";
+    const note = closing
+      ? `\n\n🗑 Closed by ${who} / بسته شد`
+      : `\n\n💡 Saved as an idea by ${who} / به‌عنوان پیشنهاد ثبت شد`;
+    /* Closing is terminal, so the buttons go. An idea is not: the user asked for
+     * something and is still owed a "noted, thanks", so a 💡 card keeps Reply. */
+    let kb = { inline_keyboard: [] };
+    if (!closing) {
+      const row = await env.DB.prepare("SELECT user_id, replied FROM contact_map WHERE group_msg_id = ?")
+        .bind(msgId).first().catch(() => null);
+      const uid = row && row.user_id;
+      const banned = uid ? await isBanned(env, uid).catch(() => false) : false;
+      kb = await cardKbFor(env, msgId, uid, banned, !!(row && row.replied));
+    }
+    await appendToCard(env, chatId, msgId, cb.message, note, kb);
+    return answerCb(env, cb.id, closing ? "Closed 🗑" : "Saved as an idea 💡");
+  }
+  if (data.startsWith("qtag:")) {
+    const [, rawId, want] = data.split(":");
+    // The id becomes part of a config key, so it has to be a number before it is
+    // interpolated, not after. Otherwise every press writes a new arbitrary row.
+    const id = Number(rawId);
+    if (!Number.isInteger(id) || id <= 0) return answerCb(env, cb.id);
+    const product = PRODUCTS[want] ? want : "proxy";
+    await setConfig(env, `qprod_${id}`, product);
+    /* Teach the inference from the correction: the next question from this user
+     * starts on the product an admin said they were actually asking about. A
+     * correction that only fixes one card is a correction you make again
+     * tomorrow. */
+    const qa = await getQa(env, +id).catch(() => null);
+    if (qa && qa.user_id) await setConfig(env, `flow_${qa.user_id}`, product);
+    const banned = qa && qa.user_id ? await isBanned(env, qa.user_id).catch(() => false) : false;
+    const mrow = await env.DB.prepare("SELECT replied FROM contact_map WHERE group_msg_id = ?")
+      .bind(msgId).first().catch(() => null);
+    // The tag lives in the card's first line; swapping the two chips in place is
+    // the whole edit, and the rest of the card must survive it untouched.
+    await tg(env, "editMessageReplyMarkup", {
+      chat_id: chatId, message_id: msgId,
+      reply_markup: contactKb(qa && qa.user_id, banned, !!(mrow && mrow.replied), null, +id, product),
+    }).catch(() => {});
+    await retagCard(env, chatId, msgId, cb.message, product);
+    return answerCb(env, cb.id, `${PRODUCTS[product].tag}`);
+  }
   if (data.startsWith("ban:") || data.startsWith("unban:")) {
     const group = await getConfig(env, "contact_group_id", "");
     if (!group || String(chatId) !== String(group)) return answerCb(env, cb.id);
@@ -490,7 +556,7 @@ async function handleCallback(cb, env) {
     ).bind(msgId).first().catch(() => null);
     await tg(env, "editMessageReplyMarkup", {
       chat_id: chatId, message_id: msgId,
-      reply_markup: contactKb(targetId, ban, !!(mrow && mrow.replied)),
+      reply_markup: await cardKbFor(env, msgId, targetId, ban, !!(mrow && mrow.replied)),
     }).catch(() => {});
     return;
   }
@@ -537,7 +603,11 @@ async function handleCallback(cb, env) {
 
   if (data === "menu") return replaceWithMenu(env, chatId, msgId, cb.from, lang);
   if (data === "lang") return toggleLang(env, chatId, cb.from.id, lang, msgId);
+  /* Remember which product they are here for. `inferProduct` reads this when
+   * their next message reaches support, which is far more reliable than reading
+   * the words of a message written by someone who is already stuck. */
   if (data === "install") {
+    await setConfig(env, `flow_${cb.from.id}`, "proxy");
     await setConfig(env, `await_token_${cb.from.id}`, "1");
     await setConfig(env, `await_utoken_${cb.from.id}`, "");
     return showView(env, chatId, msgId, t(lang, "install_text"), { reply_markup: installKeyboard(lang, true) });
@@ -575,11 +645,13 @@ async function handleCallback(cb, env) {
   if (data === "deploy")
     return showView(env, chatId, msgId, t(lang, "deploy_title"), { reply_markup: deployMarkup(lang) });
   if (data === "dep_panel") {
+    await setConfig(env, `flow_${cb.from.id}`, "proxy");
     // Same as Install: arm the token-paste state so a pasted token builds the panel.
     await setConfig(env, `await_token_${cb.from.id}`, "1");
     await setConfig(env, `await_utoken_${cb.from.id}`, "");
     return showView(env, chatId, msgId, t(lang, "deploy_panel_text"), { reply_markup: depPanelKeyboard(lang) });
   }
+  if (data === "dep_vps") await setConfig(env, `flow_${cb.from.id}`, "server");
   if (data === "dep_vps")
     return showView(env, chatId, msgId, t(lang, "deploy_vps_text"), { reply_markup: depVpsKeyboard(lang) });
   if (data === "dep_sub")
@@ -763,11 +835,53 @@ async function startContact(env, chatId, userId, lang) {
   return send(env, chatId, t(lang, "contact_start"));
 }
 
+/* Which product a question is about, so the person who runs Cloudflare panels
+ * and the person who runs VPS nodes can each see at a glance what is theirs.
+ *
+ * INFERRED, never demanded. Asking the user to classify their own problem is
+ * asking them to know the answer before they ask the question, and the ones who
+ * most need support are the least able to. So this guesses and the card carries
+ * a one-tap correction, which is also the only honest way to present a guess.
+ *
+ * Two signals, strongest first:
+ *   1. The flow they were last in. Someone who just pressed "Nova on your own
+ *      VPS" and then wrote is asking about the server. This is recorded on the
+ *      button press and is by far the better signal.
+ *   2. Words in the message, as a fallback for people who write without
+ *      touching a button first. Deliberately narrow: terms that belong to one
+ *      product and not the other, in both languages. "پنل" is absent on purpose,
+ *      since both products have one.
+ */
+export const PRODUCTS = {
+  proxy: { tag: "🟣 Proxy", fa: "پروکسی" },
+  server: { tag: "🔵 Server", fa: "سرور" },
+};
+
+const SERVER_WORDS = /\b(vps|ssh|ubuntu|debian|sudo|root|node|xray|sing-?box|hysteria|amnezia|wireguard|systemctl|nova-node|installer)\b|سرور|وی ?پی ?اس|نود|اس ?اس ?اچ/i;
+const PROXY_WORDS = /\b(cloudflare|worker|workers\.dev|d1|kv|api ?token|subdomain|zone)\b|کلودفلر|ورکر|توکن|ساب ?دامین/i;
+
+export async function inferProduct(env, userId, said) {
+  const flow = await getConfig(env, `flow_${userId}`, "");
+  if (flow === "server" || flow === "proxy") return flow;
+  const text = String(said || "");
+  const server = SERVER_WORDS.test(text);
+  const proxy = PROXY_WORDS.test(text);
+  // Only decide on an unambiguous hit. A message mentioning both is not
+  // evidence, and the default is the product most users are here for.
+  if (server && !proxy) return "server";
+  return "proxy";
+}
+
 // Admin-group action buttons shown under every forwarded message / whois card.
 // Labels are bilingual (EN / FA) since the group has no single language. Once
 // an admin has answered, the Reply button turns green and reads "Replied".
 // draftQaId adds a one-tap "Send draft" button for the AI-drafted reply.
-export function contactKb(userId, banned, replied, draftQaId = null) {
+//
+// Close and Suggestion write `source` on the qa_log row: an admin deciding a
+// question needs no reply, and an admin marking it as a product suggestion
+// rather than a support request. Both existed before and are rebuilt against
+// the values already in the database.
+export function contactKb(userId, banned, replied, draftQaId = null, qaId = null, product = null) {
   const rows = [];
   if (draftQaId && !replied) {
     rows.push([{ text: "🤖 Send AI draft / ارسال پیش‌نویس", callback_data: `dok:${draftQaId}`, style: "success" }]);
@@ -780,7 +894,84 @@ export function contactKb(userId, banned, replied, draftQaId = null) {
       ? { text: "✅ Unblock / رفع مسدودی", callback_data: `unban:${userId}` }
       : { text: "🚫 Block / مسدود", callback_data: `ban:${userId}`, style: "danger" },
   ]);
+  if (qaId) {
+    rows.push([
+      { text: "🗑 Close / بستن", callback_data: `qclose:${qaId}` },
+      { text: "💡 Suggestion / پیشنهاد", callback_data: `qsugg:${qaId}` },
+    ]);
+    // The correction, showing what it would BECOME rather than what it is, so
+    // the button says what pressing it does.
+    if (product) {
+      const other = product === "server" ? "proxy" : "server";
+      rows.push([{
+        text: `↔ Not ${PRODUCTS[product].tag.split(" ")[1]}? → ${PRODUCTS[other].tag}`,
+        callback_data: `qtag:${qaId}:${other}`,
+      }]);
+    }
+  }
   return { inline_keyboard: rows };
+}
+
+/* The keyboard for a card that already EXISTS. Reply and Block re-render the
+ * card, and if they rebuild it from only the arguments they happen to have, the
+ * Close, Suggestion and tag rows vanish the moment an admin answers, which is
+ * exactly when the rest of the row is still wanted. So every re-render resolves
+ * the same qa_id and tag the card was built with. */
+/* Editing a card without destroying it.
+ *
+ * `cb.message.text` is the card with all its formatting stripped, so the obvious
+ * edit (re-send that text as HTML) silently flattens every bold name and italic
+ * line in the card. Telegram's answer is to send the plain text back together
+ * with its `entities`, which is what these two do. Appending at the END matters
+ * for the same reason: entity offsets are absolute, so anything inserted ahead
+ * of them would slide the formatting off the words it belongs to.
+ */
+async function editCard(env, chatId, msgId, message, text, entities, kb) {
+  const isCaption = !!(message && message.caption);
+  return tg(env, isCaption ? "editMessageCaption" : "editMessageText", {
+    chat_id: chatId, message_id: msgId,
+    ...(isCaption
+      ? { caption: text.slice(0, 1024), caption_entities: entities }
+      : { text: text.slice(0, 4096), entities }),
+    ...(kb ? { reply_markup: kb } : {}),
+  }).catch((e) => console.log("card edit failed", e && e.message));
+}
+
+function cardBody(message) {
+  const text = (message && (message.text || message.caption)) || "";
+  const entities = (message && (message.entities || message.caption_entities)) || [];
+  return { text, entities };
+}
+
+async function appendToCard(env, chatId, msgId, message, note, kb) {
+  const { text, entities } = cardBody(message);
+  return editCard(env, chatId, msgId, text + note, entities, kb);
+}
+
+/* Swapping the product chip. Same length in code units either way (both tags are
+ * one emoji plus one word), but the words differ in length, so any entity that
+ * starts after the chip has to shift by the difference or the card's formatting
+ * walks sideways every time someone corrects a tag. */
+async function retagCard(env, chatId, msgId, message, product) {
+  const { text, entities } = cardBody(message);
+  const other = product === "server" ? "proxy" : "server";
+  const from = PRODUCTS[other].tag, to = PRODUCTS[product].tag;
+  const at = text.indexOf(from);
+  if (at < 0) return; // already carries this tag, or the card predates tagging
+  // UTF-16 code units, because that is the unit Telegram counts offsets in.
+  const delta = to.length - from.length;
+  const shifted = delta === 0 ? entities : entities.map((e) =>
+    e.offset > at ? { ...e, offset: e.offset + delta } : e);
+  return editCard(env, chatId, msgId, text.slice(0, at) + to + text.slice(at + from.length), shifted, null);
+}
+
+async function cardKbFor(env, groupMsgId, userId, banned, replied) {
+  const row = await env.DB.prepare(
+    "SELECT qa_id FROM contact_map WHERE group_msg_id = ?"
+  ).bind(groupMsgId).first().catch(() => null);
+  const qaId = (row && row.qa_id) || null;
+  const stored = qaId ? await getConfig(env, `qprod_${qaId}`, "") : "";
+  return contactKb(userId, banned, replied, null, qaId, PRODUCTS[stored] ? stored : null);
 }
 
 // Every support message is logged to qa_log. In 'auto' mode the AI answers the
@@ -920,9 +1111,14 @@ async function forwardContact(env, from, chatId, msg, lang, { qaId = null, note 
   const media = contactMedia(msg);
   const said = (msg.text || msg.caption || "").trim();
   const card = await gatherUserCard(env, from.id, from);
-  const intro = (note ? note + "\n\n" : "") + `✉️ <b>New message</b>\n\n`;
-  const tail = `\n\n<i>Tap Reply below, or reply to this message, to answer them.</i>`;
-  const kb = contactKb(from.id, false);
+  /* Bilingual, because the admin group is. This card had EN / FA on every line
+   * before a deploy from a stale repo reverted it to English only. */
+  const product = await inferProduct(env, from.id, said);
+  const intro = (note ? note + "\n\n" : "")
+    + `✉️ <b>New message</b> / پیام جدید   ${PRODUCTS[product].tag}\n\n`;
+  const tail = `\n\n<i>Tap Reply below, or reply to this message, to answer them. / `
+    + `برای پاسخ، دکمهٔ «پاسخ» را بزنید یا روی همین پیام ریپلای کنید.</i>`;
+  const kb = contactKb(from.id, false, false, null, qaId, product);
   // Caption when the attachment itself is the card: the user's words (if any),
   // then the identity. No "[photo]" placeholder, since the media is right there.
   const mediaCaption = intro + (said ? `“${esc(said)}”\n\n` : "") + card.text + tail;
@@ -961,6 +1157,7 @@ async function forwardContact(env, from, chatId, msg, lang, { qaId = null, note 
     await env.DB.prepare(
       "INSERT OR REPLACE INTO contact_map (group_msg_id, user_id, card_msg_id, qa_id) VALUES (?, ?, ?, ?)"
     ).bind(cardMsgId, from.id, cardMsgId, qaId).run();
+    if (qaId) await setConfig(env, `qprod_${qaId}`, product);
   }
   await send(env, chatId, t(lang, "contact_sent"), { reply_markup: { inline_keyboard: [backRow(lang)] } });
   return { cardMsgId };
@@ -1043,7 +1240,7 @@ async function handleGroupReply(msg, env) {
     const banned = await isBanned(env, userId);
     await tg(env, "editMessageReplyMarkup", {
       chat_id: msg.chat.id, message_id: cardId,
-      reply_markup: contactKb(userId, banned, true),
+      reply_markup: await cardKbFor(env, cardId, userId, banned, true),
     }).catch(() => {});
   }
 }

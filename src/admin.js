@@ -4,9 +4,9 @@
 // password) and naming the admin who approved it.
 
 import { tg, send, esc } from "./telegram.js";
-import { getConfig, setConfig, listFaq, listSections, stats, overview, listWaitingQa, markBlocked, listUsers, setBanned, getQa, getUserLang, setQaAnswer, isBanned, listOffenders, resetOffender, setOffenderStatus } from "./db.js";
+import { getConfig, setConfig, listFaq, listSections, stats, overview, listWaitingQa, markBlocked, listUsers, setBanned, getQa, getUserLang, setQaAnswer, isBanned, listOffenders, resetOffender, setOffenderStatus, listSuggestions, setQaSource } from "./db.js";
 import { suggestFaqs, aiEnabled } from "./ai.js";
-import { contactKb } from "./bot.js";
+import { contactKb, PRODUCTS } from "./bot.js";
 import { t } from "./i18n.js";
 import { DASHBOARD_HTML, LOGIN_HTML, VERIFY_HTML } from "./admin_ui.js";
 import {
@@ -213,6 +213,21 @@ async function handleApi(request, env, ctx, res, method) {
     return json(await listWaitingQa(env, { limit: 200 }));
   }
 
+  /* Suggestions: messages an admin tagged 💡 in the Telegram group rather than
+   * answering. They are feature requests from users, and they were disappearing
+   * into the qa_log with nowhere to read them back. Marking one done keeps it in
+   * the list (source 'suggestion_done') instead of deleting it, since the point
+   * of the pile is to still be there when you plan the next release. */
+  if (res === "suggestions" && method === "GET") {
+    return json(await listSuggestions(env, 200));
+  }
+  if (res === "suggestion-done" && method === "POST") {
+    const id = Number(body.id);
+    if (!id) return json({ error: "empty" }, 400);
+    await setQaSource(env, id, body.undo ? "suggestion" : "suggestion_done");
+    return json({ ok: true });
+  }
+
   // Answer a support question straight from the panel: deliver via the bot in
   // the user's language, record it (the AI learns from it), and flip any
   // Telegram group cards for this question to "Replied".
@@ -243,13 +258,16 @@ async function handleApi(request, env, ctx, res, method) {
     const { results } = await env.DB.prepare(
       "SELECT group_msg_id, card_msg_id FROM contact_map WHERE qa_id = ?"
     ).bind(id).all().catch(() => ({ results: [] }));
+    // Keep the Close / Suggestion / tag rows: answering from the panel must not
+    // strip buttons off a card the group is still working with.
+    const stored = await getConfig(env, `qprod_${id}`, "");
     for (const row of results || []) {
       await env.DB.prepare("UPDATE contact_map SET replied = 1 WHERE group_msg_id = ?")
         .bind(row.group_msg_id).run().catch(() => {});
       if (group && row.group_msg_id === row.card_msg_id) {
         await tg(env, "editMessageReplyMarkup", {
           chat_id: group, message_id: row.group_msg_id,
-          reply_markup: contactKb(qa.user_id, banned, true),
+          reply_markup: contactKb(qa.user_id, banned, true, null, id, PRODUCTS[stored] ? stored : null),
         }).catch(() => {});
       }
     }
