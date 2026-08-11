@@ -336,9 +336,30 @@ const MEMBER_CACHE_MS = 15 * 60 * 1000;
 const NON_MEMBER_CACHE_MS = 30 * 1000;
 
 /* Errors that mean the check is broken for EVERYONE, not for this user. Only
- * these open the gate. */
-const CHAT_LEVEL_ERROR =
-  /chat not found|bot is not a member|not enough rights|CHAT_ADMIN_REQUIRED|CHANNEL_PRIVATE|USER_ID_INVALID|user not found/i;
+ * these open the gate.
+ *
+ * "member list is inaccessible" and "bot was kicked" are the two that matter
+ * most and the two easiest to leave out, because they are what Telegram actually
+ * says when the bot loses admin on the channel, which is the single most likely
+ * way this ever breaks. Missing them would fail CLOSED and refuse every user of
+ * the bot until someone noticed, which is a worse outage than the hole this
+ * whole change was written to close.
+ *
+ * The user-level entries are safe to open on because the user id arrives inside
+ * a webhook Telegram authenticated; nobody can choose their own id to provoke
+ * one. */
+const CHAT_LEVEL_ERROR = new RegExp([
+  "chat not found",
+  "member list is inaccessible",     // bot is no longer an admin of the channel
+  "bot was kicked",                  // bot removed from the channel
+  "bot is not a member",
+  "not enough rights",
+  "CHAT_ADMIN_REQUIRED",
+  "CHANNEL_PRIVATE",
+  "USER_ID_INVALID",
+  "PARTICIPANT_ID_INVALID",
+  "user not found",
+].join("|"), "i");
 
 function channelSlug(raw) {
   return (raw || "").trim().replace(/^https?:\/\/t\.me\//i, "").replace(/^@/, "");

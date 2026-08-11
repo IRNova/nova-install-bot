@@ -180,3 +180,32 @@ test("a future-dated refusal is not a permanent lockout either", async () => {
   const h = await run(() => ({ ok: true, result: { status: "member" } }), { member_5150: "!" + future });
   assert.ok(!wasRefused(h), "a future-dated refusal locked a real member out forever");
 });
+
+test("losing channel admin fails open, in the words Telegram actually uses", async () => {
+  /* The lockout case, and the one most easily missed by writing the list from
+   * memory: when the bot is demoted or removed from the channel, Telegram does
+   * not say "not enough rights", it says "member list is inaccessible" or
+   * "bot was kicked". Treating those as transient would refuse every user of the
+   * bot until a human noticed, which is a worse outage than the hole this whole
+   * change exists to close. */
+  const configErrors = [
+    "Bad Request: member list is inaccessible",
+    "Forbidden: bot was kicked from the channel chat",
+    "Bad Request: CHAT_ADMIN_REQUIRED",
+    "Bad Request: chat not found",
+    "Bad Request: PARTICIPANT_ID_INVALID",
+  ];
+  for (const description of configErrors) {
+    const h = await run(() => ({ ok: false, error_code: 400, description }));
+    assert.ok(!wasRefused(h), `would lock everyone out on: ${description}`);
+  }
+});
+
+test("the fail-open list does not swallow a transient error", async () => {
+  // The other direction: the list must stay narrow, or it becomes the old bug
+  // wearing a regex.
+  for (const description of ["Too Many Requests: retry after 30", "Internal Server Error", "Bad Gateway"]) {
+    const h = await run(() => ({ ok: false, error_code: 429, description }));
+    assert.ok(wasRefused(h), `fail-open list is too broad, matched: ${description}`);
+  }
+});
