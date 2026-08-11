@@ -53,14 +53,18 @@ function stubEnv() {
   return { env, writes, config };
 }
 
-const press = (data, chatId) => ({
+const press = (data, chatId, text = "card") => ({
   update_id: 1,
   callback_query: {
     id: "cbid", from: { id: 424242424, is_bot: false, first_name: "Tester" },
-    message: { message_id: 42, date: 1, chat: { id: chatId, type: chatId === GROUP ? "supergroup" : "private" }, text: "card" },
+    message: { message_id: 42, date: 1, chat: { id: chatId, type: chatId === GROUP ? "supergroup" : "private" }, text },
     chat_instance: "1", data,
   },
 });
+
+// A card as forwardContact actually builds it, tag and all, since the retag path
+// only does a text edit when it can find the tag to swap.
+const CARD = "\u2709\uFE0F New message / \u067E\u06CC\u0627\u0645 \u062C\u062F\u06CC\u062F   \u2068\uD83D\uDFE3 Proxy\u2069\n\n\u201Chelp\u201D";
 
 const CARD_ACTIONS = ["reply:777", "dok:5", "qclose:5", "qsugg:5", "qtag:5:server", "ban:777", "unban:777"];
 
@@ -158,4 +162,67 @@ test("a malformed qa id never reaches a config key", async () => {
   }
   const keys = writes.filter((w) => /INSERT INTO config/i.test(w.sql)).map((w) => w.binds[0]);
   assert.ok(keys.includes("qprod_5"), `a valid id wrote ${JSON.stringify(keys)}`);
+});
+
+/* Reported by a support admin: pressing the tag button changed the label and
+ * took every button on the card with it.
+ *
+ * The cause is a Telegram rule that is easy to forget and silent when broken:
+ * editMessageText DROPS the inline keyboard unless reply_markup is passed. The
+ * code set the buttons first and edited the text second, so the second call
+ * quietly undid the first. Correcting how a ticket is FILED must never change
+ * how workable the ticket IS.
+ */
+test("correcting the tag keeps the card's buttons", async () => {
+  const { env } = stubEnv();
+  const tg = stubFetch();
+  try {
+    await handleUpdate(press("qtag:5:server", GROUP, CARD), env);
+  } finally {
+    tg.restore();
+  }
+
+  const edits = tg.calls.filter((c) => /^editMessage(Text|Caption)$/.test(c.method));
+  assert.ok(edits.length, `no card edit happened; calls: ${tg.calls.map((c) => c.method).join(", ")}`);
+  for (const e of edits) {
+    const rows = e.body.reply_markup && e.body.reply_markup.inline_keyboard;
+    assert.ok(rows && rows.length, "the text edit omitted reply_markup, which clears the keyboard");
+    const labels = rows.flat().map((b) => b.text).join(" | ");
+    assert.match(labels, /Reply/, `the card lost its Reply button: ${labels}`);
+  }
+  // And nothing may follow the edit that strips them back off.
+  const stripped = tg.calls.find((c) => c.method === "editMessageReplyMarkup"
+    && !(c.body.reply_markup && (c.body.reply_markup.inline_keyboard || []).length));
+  assert.ok(!stripped, "a later call cleared the keyboard again");
+});
+
+test("closing is the one action that does clear the buttons", async () => {
+  // The contrast matters: Close is terminal, so an empty keyboard there is the
+  // intended end state and not the same bug.
+  const { env } = stubEnv();
+  const tg = stubFetch();
+  try {
+    await handleUpdate(press("qclose:5", GROUP), env);
+  } finally {
+    tg.restore();
+  }
+  const edit = tg.calls.find((c) => /^editMessage(Text|Caption)$/.test(c.method));
+  assert.deepEqual(edit.body.reply_markup, { inline_keyboard: [] });
+});
+
+test("a card from before tagging still keeps its buttons when retagged", async () => {
+  /* Older cards carry no tag, so there is nothing in the text to swap. That path
+   * returned early, which would have thrown away the keyboard the handler had
+   * just rebuilt: the same missing-buttons bug by a different route. */
+  const { env } = stubEnv();
+  const tg = stubFetch();
+  try {
+    await handleUpdate(press("qtag:5:server", GROUP, "an old card with no tag"), env);
+  } finally {
+    tg.restore();
+  }
+  const set = tg.calls.find((c) => c.method === "editMessageReplyMarkup");
+  assert.ok(set, "the keyboard was never restated on an untagged card");
+  const labels = set.body.reply_markup.inline_keyboard.flat().map((b) => b.text).join(" | ");
+  assert.match(labels, /Reply/, `buttons missing: ${labels}`);
 });

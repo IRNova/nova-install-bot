@@ -222,10 +222,12 @@ export async function pruneProductHints(env) {
 /** Questions an admin flagged as a product suggestion, newest first. */
 export async function listSuggestions(env, limit = 100) {
   const r = await env.DB.prepare(
-    "SELECT id, user_id, lang, question, source, created_at FROM qa_log " +
-    "WHERE source IN ('suggestion','suggestion_done') ORDER BY id DESC LIMIT ?"
+    "SELECT q.id, q.user_id, q.lang, q.question, q.source, q.created_at, " +
+    "       c.value AS product FROM qa_log q " +
+    "LEFT JOIN config c ON c.key = 'qprod_' || q.id " +
+    "WHERE q.source IN ('suggestion','suggestion_done') ORDER BY q.id DESC LIMIT ?"
   ).bind(limit).all();
-  return r.results || [];
+  return (r.results || []).map((x) => ({ ...x, product: x.product === "server" ? "server" : "proxy" }));
 }
 
 export async function countSuggestions(env) {
@@ -312,8 +314,12 @@ export async function listWaitingQa(env, { limit = 200 } = {}) {
   // Blocked (banned) users are excluded: once you block someone, their pending
   // questions leave the inbox so the queue matches who you actually answer.
   const { results } = await env.DB.prepare(
-    "SELECT q.id, q.user_id, q.question, q.lang, q.draft, q.draft_sure, q.created_at FROM qa_log q " +
+    "SELECT q.id, q.user_id, q.question, q.lang, q.draft, q.draft_sure, q.created_at, " +
+    // The product tag, from the same config row the Telegram card is filed by,
+    // so the panel and the group cannot disagree about who owns a ticket.
+    "       c.value AS product FROM qa_log q " +
     "LEFT JOIN users u ON u.id = q.user_id " +
+    "LEFT JOIN config c ON c.key = 'qprod_' || q.id " +
     "WHERE (q.answer IS NULL OR q.answer = '') AND COALESCE(u.banned, 0) = 0 ORDER BY q.id DESC LIMIT ?"
   ).bind(limit).all().catch(() => ({ results: [] }));
   return (results || []).map((r) => ({
@@ -324,6 +330,9 @@ export async function listWaitingQa(env, { limit = 200 } = {}) {
     status: "waiting",
     draft: r.draft ? String(r.draft) : "",
     draft_sure: r.draft_sure === 1,
+    // Untagged questions predate the tag; they read as proxy, which is what the
+    // inference defaults to, rather than as a third state the filter must show.
+    product: r.product === "server" ? "server" : "proxy",
     created_at: r.created_at,
   }));
 }

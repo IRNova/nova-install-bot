@@ -64,6 +64,11 @@ code{font-family:ui-monospace,'SF Mono',SFMono-Regular,Menlo,monospace;font-size
 .nav-item:hover{background:color-mix(in srgb,var(--tx) 4%,transparent);color:var(--tx)}
 .nav-item.on{background:color-mix(in srgb,var(--tx) 6%,transparent);color:var(--tx);font-weight:600}
 .nav-item.on::before{content:'';position:absolute;inset-inline-start:0;top:9px;bottom:9px;width:3px;border-radius:0 3px 3px 0;background:var(--grad)}
+.segs{display:flex;gap:2px;padding:2px;border-radius:var(--r-sm);background:color-mix(in srgb,var(--tx) 5%,transparent);margin-inline-start:auto}
+.seg{display:inline-flex;align-items:center;gap:5px;border:0;background:none;color:var(--mu);font:inherit;font-size:12px;font-weight:600;padding:5px 10px;border-radius:calc(var(--r-sm) - 2px);cursor:pointer;white-space:nowrap}
+.seg:hover{color:var(--tx)}
+.seg.on{background:var(--bg);color:var(--tx);box-shadow:0 1px 2px rgba(0,0,0,.18)}
+.prodchip{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:600;color:var(--mu);white-space:nowrap}
 .nav-badge{margin-inline-start:auto;min-width:20px;height:20px;padding:0 6px;border-radius:10px;background:var(--wn);color:#fff;font-size:11.5px;font-weight:700;line-height:20px;text-align:center;font-variant-numeric:tabular-nums}
 html[dir=rtl] .nav-item.on::before{border-radius:3px 0 0 3px}
 .nav-item.on svg{opacity:1;color:var(--ac)}
@@ -523,6 +528,11 @@ export const DASHBOARD_HTML = HEAD("Nova Bot Admin") + `<body>${THEME_BOOT}
   <div class="pane" data-pane="inbox">
    <div class="ovbar">
     <span class="muted" id="inboxupd"></span>
+    <div class="segs" id="inboxupdsegs">
+     <button class="seg on" data-prod="all" onclick="setProd(this,loadInbox)" data-k="pf_all">All</button>
+     <button class="seg" data-prod="proxy" onclick="setProd(this,loadInbox)">🟣 <span data-k="pf_proxy">Proxy</span></button>
+     <button class="seg" data-prod="server" onclick="setProd(this,loadInbox)">🔵 <span data-k="pf_server">Server</span></button>
+    </div>
     <button class="btn ghost sm" id="inboxrefresh" onclick="loadInbox()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg><span data-k="ov_refresh">Refresh</span></button>
    </div>
    <div class="card"><div id="inboxfeed"></div></div>
@@ -532,6 +542,11 @@ export const DASHBOARD_HTML = HEAD("Nova Bot Admin") + `<body>${THEME_BOOT}
   <div class="pane" data-pane="ideas">
    <div class="ovbar">
     <span class="muted" id="ideaupd"></span>
+    <div class="segs" id="ideaupdsegs">
+     <button class="seg on" data-prod="all" onclick="setProd(this,loadIdeas)" data-k="pf_all">All</button>
+     <button class="seg" data-prod="proxy" onclick="setProd(this,loadIdeas)">🟣 <span data-k="pf_proxy">Proxy</span></button>
+     <button class="seg" data-prod="server" onclick="setProd(this,loadIdeas)">🔵 <span data-k="pf_server">Server</span></button>
+    </div>
     <button class="btn ghost sm" id="idearefresh" onclick="loadIdeas()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg><span data-k="ov_refresh">Refresh</span></button>
    </div>
    <div class="card"><div id="ideafeed"></div></div>
@@ -706,6 +721,9 @@ var I={en:{manage:'Manage',help:'Help',guide:'Guide',stats:'Overview',inbox:'Wai
  ideas:'Ideas',ptitle_ideas:'Ideas',psub_ideas:'What users asked for, tagged 💡 in the group',
  idea_count:'{n} open',idea_none:'No ideas yet. Tap 💡 on a message in the Telegram group to keep it here.',
  idea_done:'Done',idea_undo:'Reopen',idea_done_tag:'done',idea_open_tag:'idea',
+ pf_all:'All',pf_proxy:'Proxy',pf_server:'Server',
+ inbox_none_prod:'Nothing waiting for this product. Switch to All to see the rest.',
+ idea_none_prod:'No ideas for this product. Switch to All to see the rest.',
  inbox_count:'{n} waiting',inbox_none:'Nothing waiting. Every question has been answered.',
  ptitle_stats:'Overview',psub_stats:'How Nova Bot is doing, at a glance',ptitle_faq:'FAQ',psub_faq:'Questions users can browse',
  ptitle_sections:'Menu sections',psub_sections:'Custom buttons on the bot menu',ptitle_settings:'Settings',psub_settings:'Welcome text and contact',
@@ -754,6 +772,9 @@ fa:{manage:'مدیریت',help:'راهنما',guide:'راهنما',stats:'نما
  ideas:'ایده‌ها',ptitle_ideas:'ایده‌ها',psub_ideas:'چیزی که کاربران خواسته‌اند، با 💡 در گروه علامت خورده',
  idea_count:'{n} باز',idea_none:'هنوز ایده‌ای نیست. در گروه تلگرام روی پیام 💡 بزنید تا اینجا بماند.',
  idea_done:'انجام شد',idea_undo:'بازکردن دوباره',idea_done_tag:'انجام‌شده',idea_open_tag:'ایده',
+ pf_all:'همه',pf_proxy:'پروکسی',pf_server:'سرور',
+ inbox_none_prod:'برای این محصول چیزی در انتظار نیست. برای دیدن بقیه روی «همه» بزن.',
+ idea_none_prod:'برای این محصول ایده‌ای نیست. برای دیدن بقیه روی «همه» بزن.',
  inbox_count:'{n} در انتظار',inbox_none:'چیزی در انتظار نیست. به همه سؤال‌ها جواب داده شده.',
  ptitle_stats:'نمای کلی',psub_stats:'وضعیت ربات در یک نگاه',ptitle_faq:'سؤالات متداول',psub_faq:'سؤال‌هایی که کاربران می‌بینند',
  ptitle_sections:'بخش‌های منو',psub_sections:'دکمه‌های سفارشی منوی ربات',ptitle_settings:'تنظیمات',psub_settings:'متن خوش‌آمد و تماس',
@@ -814,7 +835,10 @@ var GUIDE={en:[
   'Tapping 💡 also clears the message from <b>Waiting</b>, so an idea does not keep looking like an unanswered question. The card keeps its Reply button, so you can still tell the user you noted it.',
   '<b>Done</b> marks an idea as shipped. It stays in the list rather than disappearing: it is the record of what your users asked for and what you built for them. <b>Reopen</b> puts it back.',
   'The <b>🗑 Close</b> button next to it is the other case: a message that needs no reply at all. It clears the question without recording anything.']},
- {h:'🟣 Proxy or 🔵 Server, the tag on every message',intro:'Each forwarded message is tagged with the product the person is asking about, so whoever handles Cloudflare panels and whoever handles VPS nodes can each see at a glance what is theirs.',s:[
+ {h:'🟣 Proxy or 🔵 Server, sorting the tickets',intro:'Each forwarded message is tagged with the product the person is asking about, so whoever handles Cloudflare panels and whoever handles VPS nodes can each work their own queue instead of reading everything.',s:[
+  '<b>In your admin group</b>, if the group has <b>Topics</b> switched on, cards are posted into a 🟣 Proxy topic and a 🔵 Server topic, created automatically the first time each is needed. A server helper opens 🔵 Server and everything in it is theirs. Replying works exactly as before, inside the topic.',
+  'Topics are a Telegram group setting: open the group, <b>Manage group → Topics</b>, and turn it on. The bot also needs <b>Manage topics</b> permission. Without either, cards keep arriving in the group as one list, nothing breaks.',
+  '<b>In this panel</b>, the <b>Waiting</b> and <b>Ideas</b> tabs have an All / 🟣 Proxy / 🔵 Server switch. Your choice is remembered on this device, per tab. The number badge keeps counting the whole queue, not the filtered view, so it still tells you how much work is left.',
   'The tag is a <b>guess</b>. It comes from the flow the user last opened in the bot, and failing that from the words in their message.',
   'When the guess is wrong, tap the arrow button under the card to flip it. That also fixes the guess for that user\\'s next message, so a correction only has to be made once.']},
  {h:'🖼️ Replying with a photo',s:[
@@ -880,9 +904,12 @@ fa:[
   'زدن 💡 پیام را از <b>در انتظار</b> هم پاک می‌کند تا یک ایده مثل سؤال بی‌جواب به نظر نرسد. دکمهٔ پاسخ روی کارت می‌ماند تا بتوانید به کاربر بگویید ثبت شد.',
   '<b>انجام شد</b> یعنی ایده ساخته شده. از فهرست حذف نمی‌شود: همین فهرست سند این است که کاربران چه خواستند و شما چه ساختید. <b>بازکردن دوباره</b> آن را برمی‌گرداند.',
   'دکمهٔ <b>🗑 بستن</b> کنارش برای حالت دیگری است: پیامی که اصلاً جواب نمی‌خواهد. سؤال را بدون ثبت چیزی پاک می‌کند.']},
- {h:'🟣 پروکسی یا 🔵 سرور، برچسب روی هر پیام',intro:'هر پیام فوروارد‌شده با نام محصولی که کاربر دربارهٔ آن می‌پرسد برچسب می‌خورد، تا هرکس پنل‌های کلودفلر را می‌چرخاند و هرکس نودهای وی‌پی‌اس را، در یک نگاه سهم خودش را ببیند.',s:[
+ {h:'🟣 پروکسی یا 🔵 سرور، مرتب‌کردن تیکت‌ها',intro:'هر پیام فوروارد‌شده با نام محصولی که کاربر دربارهٔ آن می‌پرسد برچسب می‌خورد، تا هرکس پنل‌های کلودفلر را می‌چرخاند و هرکس نودهای وی‌پی‌اس را، به‌جای خواندن همه‌چیز فقط صف خودش را کار کند.',s:[
+  '<b>در گروه ادمین</b>، اگر <b>موضوع‌ها (Topics)</b> گروه روشن باشد، کارت‌ها در موضوع 🟣 پروکسی و موضوع 🔵 سرور می‌نشینند و این دو بار اول خودکار ساخته می‌شوند. کسی که سرور را جواب می‌دهد موضوع 🔵 سرور را باز می‌کند و هرچه آنجاست مال اوست. پاسخ‌دادن دقیقاً مثل قبل است، داخل همان موضوع.',
+  'موضوع‌ها یک تنظیم گروه در تلگرام است: گروه را باز کن، <b>مدیریت گروه ← موضوع‌ها</b> و روشنش کن. ربات هم به دسترسی <b>مدیریت موضوع‌ها</b> نیاز دارد. اگر هیچ‌کدام نباشد، کارت‌ها مثل قبل در یک فهرست به گروه می‌آیند و چیزی خراب نمی‌شود.',
+  '<b>در همین پنل</b>، تب‌های <b>در انتظار</b> و <b>ایده‌ها</b> کلید همه / 🟣 پروکسی / 🔵 سرور دارند. انتخابت روی همین دستگاه و برای هر تب جدا به یاد می‌ماند. عدد روی تب کل صف را می‌شمارد نه نمای فیلترشده را، تا همچنان بگوید چقدر کار مانده.',
   'این برچسب یک <b>حدس</b> است. از مسیری می‌آید که کاربر آخرین‌بار در ربات باز کرده و اگر نبود، از واژه‌های خود پیام.',
-  'وقتی حدس غلط بود، دکمهٔ فلش زیر کارت را بزنید تا برعکس شود. همان زدن، حدسِ پیام بعدیِ همان کاربر را هم درست می‌کند، پس یک‌بار اصلاح کافی است.']},
+  'وقتی حدس غلط بود، دکمهٔ فلش زیر کارت را بزنید تا برعکس شود. کارت به موضوع دیگر منتقل می‌شود، همهٔ دکمه‌هایش سر جایشان می‌مانند و حدسِ پیام بعدیِ همان کاربر هم درست می‌شود، پس یک‌بار اصلاح کافی است.']},
  {h:'🖼️ پاسخ با عکس',s:[
   'در گروه ادمین، <b>روی پیام فوروارد‌شده با یک عکس ریپلای کن</b> (اسکرین‌شات، تصویر تنظیمات) و ربات همان عکس را برای کاربر می‌فرستد.',
   'اگر روی عکس کپشن بگذاری، متن هم همراهش می‌رود. عکس بدون کپشن هم تحویل می‌شود و سؤال جواب‌داده‌شده علامت می‌خورد.']},
@@ -1046,7 +1073,7 @@ function qrowHTML(r){
   :'<div class="btncol"><button class="btn ghost sm" onclick="qaReply('+(+r.id)+')">'+IC.reply+T('qa_reply')+'</button>'+blk+'</div>';
  return '<div class="qrow"><span class="chip '+st.c+'"><span class="dot"></span>'+T(st.k)+'</span>'+
   '<div class="body"><div class="qt" dir="auto">'+esc(q)+'</div>'+draft+
-  '<div class="meta"><span>'+esc(String(r.lang||'').toUpperCase())+'</span><span>'+rel(r.created_at)+'</span></div></div>'+
+  '<div class="meta"><span>'+esc(String(r.lang||'').toUpperCase())+'</span><span>'+rel(r.created_at)+'</span>'+prodChip(r)+'</div></div>'+
   btns+'</div>';
 }
 
@@ -1063,9 +1090,12 @@ async function loadInbox(){
  if(!rows||rows.error)rows=[];
  rememberQa(rows);
  setInboxBadge(rows.length);
- var loc=lang==='fa'?'fa-IR':'en-US';
- $('inboxupd').textContent=fmt('inbox_count',rows.length);
- $('inboxfeed').innerHTML=!rows.length?emptyBox('inbox_none'):rows.map(qrowHTML).join('');
+ syncProdSegs();
+ var shown=byProduct(rows,'inbox');
+ // The count follows the filter, the badge does not: the badge is the size of
+ // the queue, and that does not change because you looked at half of it.
+ $('inboxupd').textContent=fmt('inbox_count',shown.length);
+ $('inboxfeed').innerHTML=!shown.length?emptyBox(rows.length?'inbox_none_prod':'inbox_none'):shown.map(qrowHTML).join('');
 }
 
 /* Ideas: the 💡 pile from the Telegram group. Users write feature requests into
@@ -1077,10 +1107,11 @@ async function loadIdeas(){
  var rows=await api('GET','suggestions').catch(function(){return null});
  if(b)b.disabled=false;
  if(!rows||rows.error)rows=[];
- var open=rows.filter(function(r){return r.source==='suggestion'}).length;
- setIdeaBadge(open);
- $('ideaupd').textContent=fmt('idea_count',open);
- $('ideafeed').innerHTML=!rows.length?emptyBox('idea_none'):rows.map(idearowHTML).join('');
+ setIdeaBadge(rows.filter(function(r){return r.source==='suggestion'}).length);
+ syncProdSegs();
+ var shown=byProduct(rows,'ideas');
+ $('ideaupd').textContent=fmt('idea_count',shown.filter(function(r){return r.source==='suggestion'}).length);
+ $('ideafeed').innerHTML=!shown.length?emptyBox(rows.length?'idea_none_prod':'idea_none'):shown.map(idearowHTML).join('');
 }
 
 function idearowHTML(r){
@@ -1093,7 +1124,7 @@ function idearowHTML(r){
  var btn='<div class="btncol"><button class="btn ghost sm" onclick="ideaDone('+(+r.id)+','+(done?'1':'0')+')">'+
    T(done?'idea_undo':'idea_done')+'</button></div>';
  return '<div class="qrow">'+chip+'<div class="body"><div class="qt" dir="auto">'+esc(q)+'</div>'+
-  '<div class="meta"><span>'+esc(String(r.lang||'').toUpperCase())+'</span><span>'+rel(r.created_at)+'</span></div></div>'+
+  '<div class="meta"><span>'+esc(String(r.lang||'').toUpperCase())+'</span><span>'+rel(r.created_at)+'</span>'+prodChip(r)+'</div></div>'+
   btn+'</div>';
 }
 
@@ -1105,6 +1136,38 @@ async function ideaDone(id,isDone){
 function setIdeaBadge(n){
  var b=$('ideabadge');if(!b)return;
  b.textContent=nf(n);b.classList.toggle('hidden',!n);
+}
+
+/* Which product's tickets to show. Held per pane so switching to Ideas does not
+ * silently change what Waiting is showing, and remembered on the device: someone
+ * who only handles server tickets should not have to re-pick every morning. */
+var prodOf = { inbox: localStorage.getItem('nova-prod-inbox') || 'all',
+               ideas: localStorage.getItem('nova-prod-ideas') || 'all' };
+
+function setProd(btn, loader){
+ var pane = btn.closest('.pane').dataset.pane;
+ prodOf[pane] = btn.dataset.prod;
+ localStorage.setItem('nova-prod-' + pane, btn.dataset.prod);
+ [].forEach.call(btn.parentNode.children, function(b){ b.classList.toggle('on', b === btn) });
+ loader();
+}
+
+// Reflect the stored choice after a language switch or a fresh load rebuilds the bar.
+function syncProdSegs(){
+ ['inbox','ideas'].forEach(function(pane){
+  var box = $(pane === 'inbox' ? 'inboxupdsegs' : 'ideaupdsegs'); if(!box) return;
+  [].forEach.call(box.children, function(b){ b.classList.toggle('on', b.dataset.prod === prodOf[pane]) });
+ });
+}
+
+function byProduct(rows, pane){
+ var want = prodOf[pane];
+ return want === 'all' ? rows : rows.filter(function(r){ return (r.product || 'proxy') === want });
+}
+
+function prodChip(r){
+ var p = r.product === 'server' ? 'server' : 'proxy';
+ return '<span class="prodchip"><span>' + (p === 'server' ? '🔵' : '🟣') + '</span>' + T('pf_' + p) + '</span>';
 }
 
 function setInboxBadge(n){

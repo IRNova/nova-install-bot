@@ -14,6 +14,7 @@ import { install, TOKEN_DEEPLINK, UPDATE_TOKEN_DEEPLINK, extractToken } from "./
 import { startUpdate, runUpdate, loadUpdCtx, clearUpdCtx } from "./update.js";
 import { t, normLang } from "./i18n.js";
 import { gatherUserCard } from "./userinfo.js";
+import { sendToProduct, moveCardToProduct, TOPICS } from "./topics.js";
 
 // The bot's profile description (the text shown above "Start bot"). The Latin
 // brand word is wrapped in directional isolates (U+2066 LEFT-TO-RIGHT ISOLATE
@@ -455,8 +456,14 @@ async function handleCallback(cb, env) {
       `${mention}\n` +
       `✍️ <b>Reply to ${escBidi(name)}</b> / پاسخ به ${escBidi(name)}\n` +
       `Type your message below / پیام خود را بنویسید`;
+    /* Into the same topic as the card. A ForceReply that lands in General while
+     * the admin is reading 🔵 Server is a prompt they never see, and the reply
+     * they then type goes nowhere. Inherited from the card rather than looked
+     * up, so it is right even for cards posted before topics existed. */
+    const thread = cb.message && cb.message.message_thread_id;
     const sent = await send(env, group, prompt, {
       reply_markup: { force_reply: true, selective: true, input_field_placeholder: "Your reply / پاسخ شما" },
+      ...(thread ? { message_thread_id: thread } : {}),
     }).catch(() => null);
     if (sent && sent.ok && sent.result) {
       // card_msg_id points back at the card the button sits on, so answering
@@ -544,13 +551,32 @@ async function handleCallback(cb, env) {
     const banned = qa && qa.user_id ? await isBanned(env, qa.user_id).catch(() => false) : false;
     const mrow = await env.DB.prepare("SELECT replied FROM contact_map WHERE group_msg_id = ?")
       .bind(msgId).first().catch(() => null);
-    // The tag lives in the card's first line; swapping the two chips in place is
-    // the whole edit, and the rest of the card must survive it untouched.
-    await tg(env, "editMessageReplyMarkup", {
-      chat_id: chatId, message_id: msgId,
-      reply_markup: contactKb(qa && qa.user_id, banned, !!(mrow && mrow.replied), null, +id, product),
-    }).catch(() => {});
-    await retagCard(env, chatId, msgId, cb.message, product);
+    const kb = contactKb(qa && qa.user_id, banned, !!(mrow && mrow.replied), null, id, product);
+
+    /* One edit, carrying the keyboard.
+     *
+     * Reported by a support admin: pressing the tag button changed the label and
+     * took every button with it. Correcting a tag is not an action ON the
+     * ticket, it is a correction of how the ticket is filed, so the ticket has
+     * to stay exactly as workable as it was a second earlier.
+     *
+     * The cause is that editMessageText DROPS the inline keyboard when
+     * reply_markup is omitted. Setting the buttons first and editing the text
+     * second therefore undoes the first call, which is why it looked like the
+     * tag button was deliberately clearing them. */
+    await retagCard(env, chatId, msgId, cb.message, product, kb);
+
+    /* With topics on, the correction also has to move the card: a mis-tagged
+     * ticket left in 🟣 Proxy is invisible to the person who now owns it, which
+     * defeats the point of filing it at all. Moving means copy-then-delete,
+     * since Telegram has no move, so the card's message id changes and
+     * contact_map has to follow it or replies stop finding the ticket. */
+    const moved = await moveCardToProduct(env, chatId, msgId, product, kb).catch(() => null);
+    if (moved) {
+      await env.DB.prepare(
+        "UPDATE contact_map SET group_msg_id = ?, card_msg_id = ? WHERE group_msg_id = ?"
+      ).bind(moved, moved, msgId).run().catch(() => {});
+    }
     return answerCb(env, cb.id, `${PRODUCTS[product].tag}`);
   }
   if (data.startsWith("ban:") || data.startsWith("unban:")) {
@@ -962,17 +988,22 @@ async function appendToCard(env, chatId, msgId, message, note, kb) {
  * one emoji plus one word), but the words differ in length, so any entity that
  * starts after the chip has to shift by the difference or the card's formatting
  * walks sideways every time someone corrects a tag. */
-async function retagCard(env, chatId, msgId, message, product) {
+async function retagCard(env, chatId, msgId, message, product, kb) {
   const { text, entities } = cardBody(message);
   const other = product === "server" ? "proxy" : "server";
   const from = PRODUCTS[other].tag, to = PRODUCTS[product].tag;
   const at = text.indexOf(from);
-  if (at < 0) return; // already carries this tag, or the card predates tagging
+  // Already carries this tag, or the card predates tagging. Either way the
+  // keyboard still has to be restated, because the caller has just built a new
+  // one and returning early here would silently discard it.
+  if (at < 0) return kb ? tg(env, "editMessageReplyMarkup", {
+    chat_id: chatId, message_id: msgId, reply_markup: kb,
+  }).catch(() => {}) : undefined;
   // UTF-16 code units, because that is the unit Telegram counts offsets in.
   const delta = to.length - from.length;
   const shifted = delta === 0 ? entities : entities.map((e) =>
     e.offset > at ? { ...e, offset: e.offset + delta } : e);
-  return editCard(env, chatId, msgId, message, text.slice(0, at) + to + text.slice(at + from.length), shifted, null);
+  return editCard(env, chatId, msgId, message, text.slice(0, at) + to + text.slice(at + from.length), shifted, kb);
 }
 
 async function cardKbFor(env, groupMsgId, userId, banned, replied) {
@@ -1140,31 +1171,40 @@ async function forwardContact(env, from, chatId, msg, lang, { qaId = null, note 
   const textHeader =
     intro + (said ? `“${esc(said)}”` : media ? `<i>[${media.label}]</i>` : "“”") + `\n\n` + card.text + tail;
 
+  /* Into the topic for this product, so a server person can open 🔵 Server and
+   * see only what is theirs. `sendToProduct` posts in the group itself when the
+   * group is not a forum, which is the pre-topics behaviour unchanged. */
   let cardMsgId = null;
+  let thread = null;
   if (media) {
     // Relay the attachment AS the card, so the Reply and Block buttons sit right
     // on the photo/video the admins see.
-    const copied = await tg(env, "copyMessage", {
+    const copied = await sendToProduct(env, group, product, (into) => tg(env, "copyMessage", {
       chat_id: group, from_chat_id: chatId, message_id: msg.message_id,
-      caption: mediaCaption, parse_mode: "HTML", reply_markup: kb,
-    }).catch(() => null);
+      caption: mediaCaption, parse_mode: "HTML", reply_markup: kb, ...into,
+    }).catch(() => null));
     if (copied && copied.ok && copied.result) {
       cardMsgId = copied.result.message_id;
+      thread = copied.result.message_thread_id || null;
     } else {
       // Caption too long, or a media type that can't carry one (video note):
       // fall back to a text card with the buttons, then the media beneath it.
-      const sent = await send(env, group, textHeader, { reply_markup: kb });
+      const sent = await sendToProduct(env, group, product,
+        (into) => send(env, group, textHeader, { reply_markup: kb, ...into }));
       cardMsgId = sent && sent.result && sent.result.message_id;
+      thread = (sent && sent.result && sent.result.message_thread_id) || null;
       if (cardMsgId) {
         await tg(env, "copyMessage", {
           chat_id: group, from_chat_id: chatId, message_id: msg.message_id,
-          reply_to_message_id: cardMsgId,
+          reply_to_message_id: cardMsgId, ...(thread ? { message_thread_id: thread } : {}),
         }).catch((e) => console.log("contact: media copy failed", e && e.message));
       }
     }
   } else {
-    const sent = await send(env, group, textHeader, { reply_markup: kb });
+    const sent = await sendToProduct(env, group, product,
+      (into) => send(env, group, textHeader, { reply_markup: kb, ...into }));
     cardMsgId = sent && sent.result && sent.result.message_id;
+    thread = (sent && sent.result && sent.result.message_thread_id) || null;
   }
   if (cardMsgId) {
     await env.DB.prepare(
