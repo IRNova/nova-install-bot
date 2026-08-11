@@ -8,8 +8,8 @@ export const STR = {
     menu_hi: (name) => `👋 Hi ${name}!`,
     menu_body:
       "I build your own Nova proxy panel on your Cloudflare account in about a minute, and keep it updated.\n\n📌 Use the buttons below to build, manage or get help:",
-    btn_install: "🚀 Build a new panel",
-    btn_faq: "❓ FAQ",
+    btn_install: "Build a new panel",
+    btn_faq: "FAQ",
     btn_apps: "📱 Get the Nova app",
     btn_contact: "💬 Message support",
     btn_github: "💻 GitHub source",
@@ -98,7 +98,7 @@ export const STR = {
     join_ok: "✅ Welcome!",
 
     // update panel
-    btn_update: "🛠 Manage & update panels",
+    btn_update: "Manage & update panels",
     upd_text:
       "🔄 <b>Update my panel</b>\n\n" +
       "I'll update your existing Nova panel to the latest version. Your settings, users and data stay untouched.\n\n" +
@@ -123,12 +123,12 @@ export const STR = {
     upd_expired: "This update session has expired. Tap 🔄 Update my panel and send your token again.",
 
     // support us
-    btn_support: "❤️ Support us",
+    btn_support: "Support us",
     support_title: "❤️ <b>Support us</b>\n\nNova is free and always will be. If it helps you, you can support the project:",
     support_notset: "❤️ Support isn't set up yet. Please check back later.",
 
     // follow us
-    btn_socials: "🌐 Follow Nova",
+    btn_socials: "Follow Nova",
     socials_text:
       "🌐 <b>Follow Nova</b>\n\n" +
       "News, new releases and outage notices go out on the channel first. The rest is where we post guides, clips and updates.",
@@ -139,10 +139,10 @@ export const STR = {
     soc_gh: "💻 GitHub",
 
     // Nova Server, promoted to the main menu as well as the deploy hub
-    btn_vps: "🖥 Nova on your own VPS",
+    btn_vps: "Nova on your own VPS",
 
     // deploy your own Nova (hub mirroring the app's onboarding)
-    btn_deploy: "🧭 Deploy your own Nova",
+    btn_deploy: "Deploy your own Nova",
     btn_back_deploy: "⬅️ Deploy options",
     deploy_title:
       "🧭 <b>Deploy your own Nova</b>\n\n" +
@@ -208,8 +208,8 @@ export const STR = {
     menu_hi: (name) => `👋 سلام ${name}!`,
     menu_body:
       "در حدود یک دقیقه پنل پراکسی نوای شخصی‌ات را روی حساب Cloudflare خودت می‌سازم و به‌روز نگهش می‌دارم.\n\n📌 از گزینه‌های زیر جهت ساخت یا مدیریت پنل‌های خود استفاده کنید:",
-    btn_install: "🚀 ساخت پنل جدید",
-    btn_faq: "❓ سؤالات متداول",
+    btn_install: "ساخت پنل جدید",
+    btn_faq: "سؤالات متداول",
     btn_apps: "📱 دریافت اپ نوا",
     btn_contact: "💬 پیام به پشتیبانی",
     btn_github: "💻 سورس گیت‌هاب",
@@ -294,7 +294,7 @@ export const STR = {
     join_no: "هنوز عضو نشده‌ای. اول عضو کانال شو، بعد دوباره بزن.",
     join_ok: "✅ خوش آمدی!",
 
-    btn_update: "🛠 مدیریت و آپدیت پنل‌ها",
+    btn_update: "مدیریت و آپدیت پنل‌ها",
     upd_text:
       "🔄 <b>به‌روزرسانی پنل من</b>\n\n" +
       "پنل نوای فعلی‌ات را به آخرین نسخه به‌روز می‌کنم. تنظیمات، کاربران و داده‌هایت دست‌نخورده می‌مانند.\n\n" +
@@ -318,12 +318,12 @@ export const STR = {
       "Cloudflare اتصال‌های ورکر را دقیقاً حفظ نکرد. پیش از استفاده، این ورکر را در داشبورد Cloudflare بررسی کن.",
     upd_expired: "این نشست به‌روزرسانی منقضی شد. روی 🔄 به‌روزرسانی پنل من بزن و دوباره توکن را بفرست.",
 
-    btn_support: "❤️ حمایت مالی",
+    btn_support: "حمایت مالی",
     support_title: "❤️ <b>حمایت مالی</b>\n\nنوا رایگان است و همیشه رایگان می‌ماند. اگر برایت مفید بوده، می‌توانی از پروژه حمایت کنی:",
     support_notset: "❤️ حمایت هنوز تنظیم نشده. لطفاً بعداً سر بزن.",
 
     // ما را دنبال کنید
-    btn_socials: "🌐 دنبال‌کردن نوا",
+    btn_socials: "دنبال‌کردن نوا",
     socials_text:
       "🌐 <b>دنبال‌کردن نوا</b>\n\n" +
       "خبرها، نسخه‌های تازه و اطلاع قطعی‌ها اول از همه در کانال می‌آید. بقیه جاهایی است که راهنما، ویدیو و به‌روزرسانی می‌گذاریم.",
@@ -334,10 +334,10 @@ export const STR = {
     soc_gh: "💻 گیت‌هاب",
 
     // نوا سرور، هم در منوی اصلی و هم در بخش راه‌اندازی
-    btn_vps: "🖥 نوا روی سرور خودت",
+    btn_vps: "نوا روی سرور خودت",
 
     // راه‌اندازی نوای خودت
-    btn_deploy: "🧭 راه‌اندازی نوای خودت",
+    btn_deploy: "راه‌اندازی نوای خودت",
     btn_back_deploy: "⬅️ گزینه‌های راه‌اندازی",
     deploy_title:
       "🧭 <b>راه‌اندازی نوای خودت</b>\n\n" +

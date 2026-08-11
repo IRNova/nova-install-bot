@@ -356,10 +356,17 @@ function backRow(lang) {
  * again with `/emojiid NovaProxy` if the pack is ever rebuilt.
  *
  * Rendered only while the bot owner holds Telegram Premium, or if the bot has
- * Fragment usernames. When neither holds, Telegram ignores the field: the button
- * keeps its text and its ordinary emoji prefix, so this degrades to exactly what
- * shipped before rather than to a blank button. That is why every label below
- * still starts with a normal emoji.
+ * Fragment usernames. When neither holds, Telegram ignores the field and the
+ * button falls back to its text alone.
+ *
+ * **The seven labels that get an icon carry NO emoji of their own.** They used
+ * to, as a fallback, and with the icons live that showed two emoji on every
+ * button. A permanent visual defect for every user was not worth insuring
+ * against a lapsed subscription, so the labels are clean and the fallback is
+ * plain text. Any label WITHOUT an icon below keeps its emoji.
+ *
+ * So: adding `icon_custom_emoji_id` to a button means removing the emoji from
+ * its label in BOTH languages, and removing the icon means putting it back.
  */
 const ICON = {
   shield: "5177354342549686013",
