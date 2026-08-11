@@ -8,6 +8,7 @@ import {
   logQuestion, setQaAnswer, setQaAnswerByCard, setQaDraft, markQaResolved, getQa,
   bumpOffense, setOffenderStatus,
 } from "./db.js";
+import { getPanelAdminIds } from "./admin_2fa.js";
 import { aiEnabled, autoAnswer } from "./ai.js";
 import { install, TOKEN_DEEPLINK, UPDATE_TOKEN_DEEPLINK, extractToken } from "./install.js";
 import { startUpdate, runUpdate, loadUpdCtx, clearUpdCtx } from "./update.js";
@@ -157,6 +158,35 @@ export async function handleUpdate(update, env) {
       return toggleLang(env, chatId, from.id, lang, null);
     case "/id":
       return send(env, chatId, `Your ID: <code>${from.id}</code>\nChat ID: <code>${chatId}</code>`);
+    /* Read the custom_emoji_id out of a message, so branded button icons can be
+     * wired up without guessing.
+     *
+     * `icon_custom_emoji_id` on InlineKeyboardButton needs the emoji's id, and
+     * the only way to learn one is to receive a message containing it and read
+     * the `custom_emoji` entity. Admin-only because it is a developer tool, not
+     * a feature: it does nothing for a normal user and would only confuse them.
+     *
+     * Usage: reply /emojiid to a message containing the emoji, or send
+     * /emojiid followed by them on the same line. */
+    case "/emojiid": {
+      const admins = await getPanelAdminIds(env);
+      if (admins.length && !admins.includes(String(from.id))) return;
+      const src = msg.reply_to_message || msg;
+      const ents = [...(src.entities || []), ...(src.caption_entities || [])]
+        .filter((e) => e.type === "custom_emoji" && e.custom_emoji_id);
+      if (!ents.length) {
+        return send(env, chatId,
+          "Send <code>/emojiid</code> followed by one or more custom emoji, or reply <code>/emojiid</code> to a message that has them.\n\n" +
+          "Custom emoji only: the standard ones have no id.");
+      }
+      const text = String(src.text || src.caption || "");
+      const lines = ents.map((e) => {
+        // Entity offsets are in UTF-16 code units, which is what JS strings use.
+        const glyph = text.slice(e.offset, e.offset + e.length) || "?";
+        return `${glyph}  <code>${esc(e.custom_emoji_id)}</code>`;
+      });
+      return send(env, chatId, `Custom emoji ids:\n\n${lines.join("\n")}`);
+    }
     case "/contact":
       return startContact(env, chatId, from.id, lang);
     case "/deploy":
@@ -181,7 +211,11 @@ async function menuMarkup(env, lang) {
      * deploy hub. It is a whole product and the people who want it arrive
      * already knowing they do, so making them browse for it costs installs. It
      * stays in the hub as well, for the people who are still deciding. */
-    [{ text: t(lang, "btn_vps"), callback_data: "dep_vps" }],
+    /* `primary`, because a product entry point should not be indistinguishable
+     * from "FAQ". Telegram gives exactly three button colours, so they only work
+     * by scarcity: three coloured rows out of eleven reads as a hierarchy, eight
+     * would read as noise. */
+    [{ text: t(lang, "btn_vps"), callback_data: "dep_vps", style: "primary" }],
   ];
   for (const s of await listSections(env)) rows.push([{ text: s.title, callback_data: `sec:${s.id}` }]);
   const appsBtn = { text: t(lang, "btn_apps"), callback_data: "apps" };
@@ -197,7 +231,12 @@ async function menuMarkup(env, lang) {
   // margin and was the only one carrying none of these.
   rows.push([{ text: t(lang, "btn_socials"), callback_data: "socials" }]);
   rows.push([{ text: t(lang, "btn_lang"), callback_data: "lang" }]);
-  rows.push([{ text: t(lang, "btn_support"), callback_data: "support", style: "danger" }]);
+  /* NOT `danger`. Red is Telegram's destructive style, and this bot uses that
+   * same red for "Block / مسدود" in the admin flow. A donate button wearing the
+   * ban colour is both alarming and a waste of the one style that should mean
+   * "this cannot be undone". It keeps its prominence from being the last row and
+   * from the heart. */
+  rows.push([{ text: t(lang, "btn_support"), callback_data: "support" }]);
   return { inline_keyboard: rows };
 }
 
