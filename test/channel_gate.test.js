@@ -193,7 +193,6 @@ test("losing channel admin fails open, in the words Telegram actually uses", asy
     "Forbidden: bot was kicked from the channel chat",
     "Bad Request: CHAT_ADMIN_REQUIRED",
     "Bad Request: chat not found",
-    "Bad Request: PARTICIPANT_ID_INVALID",
   ];
   for (const description of configErrors) {
     const h = await run(() => ({ ok: false, error_code: 400, description }));
@@ -204,8 +203,93 @@ test("losing channel admin fails open, in the words Telegram actually uses", asy
 test("the fail-open list does not swallow a transient error", async () => {
   // The other direction: the list must stay narrow, or it becomes the old bug
   // wearing a regex.
-  for (const description of ["Too Many Requests: retry after 30", "Internal Server Error", "Bad Gateway"]) {
+  const mustClose = [
+    "Too Many Requests: retry after 30",
+    "Internal Server Error",
+    "Bad Gateway",
+    /* Per-user errors belong here, not on the open list. Refusing one account
+     * costs it one tap; opening for it hands the bypass to exactly the people
+     * the gate exists to refuse, and the "do not punish 26k users" argument that
+     * justifies the open list cannot apply to an error scoped to one person. */
+    "Bad Request: Member not found",
+    "Bad Request: PARTICIPANT_ID_INVALID",
+    "Bad Request: USER_ID_INVALID",
+  ];
+  for (const description of mustClose) {
     const h = await run(() => ({ ok: false, error_code: 429, description }));
     assert.ok(wasRefused(h), `fail-open list is too broad, matched: ${description}`);
+  }
+});
+
+/* The community group is where a closed gate is DESTRUCTIVE.
+ *
+ * In a DM, refusing means "here is a join button". In the group it means the
+ * message is deleted. So making the gate fail closed on transient errors, which
+ * is right everywhere else, quietly turned a Telegram blip into "delete every
+ * message in the group, admins included", since isGroupAdmin fails closed in the
+ * same conditions. Nothing tested this path, which is how it got through.
+ */
+function groupHarness(chatMemberReply) {
+  const h = harness(chatMemberReply, { community_group_id: "-100777", community_gate: "1" });
+  return h;
+}
+
+const groupMsg = (id = 4242) => ({
+  update_id: 1,
+  message: {
+    message_id: 99, date: 1, chat: { id: -100777, type: "supergroup" },
+    from: { id, is_bot: false, first_name: "M" }, text: "hello everyone",
+  },
+});
+
+const deleted = (h) => h.calls.some((c) => c.method === "deleteMessage");
+
+test("a Telegram blip never deletes a message in the community group", async () => {
+  for (const [label, reply] of [
+    ["429 flood control", () => ({ ok: false, error_code: 429, description: "Too Many Requests: retry after 5" })],
+    ["500 from Telegram", () => ({ ok: false, error_code: 500, description: "Internal Server Error" })],
+    ["dropped connection", () => { throw new Error("reset"); }],
+  ]) {
+    const h = groupHarness(reply);
+    try { await handleUpdate(groupMsg(), h.env); } finally { h.restore(); }
+    assert.ok(!deleted(h), `deleted a message during: ${label}`);
+  }
+});
+
+test("a confirmed non-member still loses their message", async () => {
+  // The feature has to keep working: only uncertainty is spared, not refusal.
+  const h = groupHarness(() => ({ ok: true, result: { status: "left" } }));
+  try { await handleUpdate(groupMsg(), h.env); } finally { h.restore(); }
+  assert.ok(deleted(h), "a confirmed non-member kept their message");
+});
+
+test("a confirmed member keeps their message", async () => {
+  const h = groupHarness(() => ({ ok: true, result: { status: "member" } }));
+  try { await handleUpdate(groupMsg(), h.env); } finally { h.restore(); }
+  assert.ok(!deleted(h), "a real member had their message deleted");
+});
+
+test("a pasted Cloudflare token is deleted even when the gate refuses", async () => {
+  /* Removing a credential from a chat is the one piece of credential hygiene
+   * this bot performs, and the gate's early return used to skip it. While the
+   * gate failed open it only ever affected deliberate non-members; once it fails
+   * closed, a real member who pastes during a blip is refused and their token
+   * stays in the chat forever. */
+  const withToken = (id = 6001) => ({
+    update_id: 1,
+    message: {
+      message_id: 55, date: 1, chat: { id, type: "private" },
+      from: { id, is_bot: false, first_name: "U", language_code: "en" },
+      text: "here you go: " + "a".repeat(40),
+    },
+  });
+  for (const [label, reply] of [
+    ["a confirmed non-member", () => ({ ok: true, result: { status: "left" } })],
+    ["a transient failure", () => ({ ok: false, error_code: 429, description: "Too Many Requests" })],
+  ]) {
+    const h = harness(reply);
+    try { await handleUpdate(withToken(), h.env); } finally { h.restore(); }
+    assert.ok(h.calls.some((c) => c.method === "deleteMessage"),
+      `token left sitting in the chat for ${label}`);
   }
 });

@@ -222,8 +222,11 @@ export async function pruneProductHints(env) {
    * function exists to stop rather than to recreate. */
   const stale = await env.DB.prepare(
     "DELETE FROM config WHERE rowid IN (SELECT rowid FROM config WHERE (" +
-    "  (key LIKE 'member\\_%' ESCAPE '\\' AND value LIKE '!%')" +
+    "  ((key LIKE 'member\\_%' ESCAPE '\\' OR key LIKE 'gadmin\\_%' ESCAPE '\\')" +
+    "   AND value LIKE '!%')" +
     "  OR key LIKE 'gate\\_dm\\_%' ESCAPE '\\'" +
+    "  OR key LIKE 'gate\\_note\\_%' ESCAPE '\\'" +
+    "  OR key LIKE 'banned\\_note\\_%' ESCAPE '\\'" +
     ") AND CAST(replace(value, '!', '') AS INTEGER) < ? LIMIT 5000)"
   ).bind(Date.now() - 24 * 60 * 60 * 1000).run().catch(() => null);
   // null, not 0, when a statement failed: in the cron log a statement that threw

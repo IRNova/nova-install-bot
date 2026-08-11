@@ -104,6 +104,13 @@ export async function handleUpdate(update, env) {
 
   // Banned users get one short notice and nothing else.
   if (await isBanned(env, from.id)) {
+    /* Once, then silence. An unthrottled reply to someone already judged abusive
+     * is a free way to spend the bot's send budget, and spending that budget is
+     * now how you close the membership gate for everybody. */
+    const key = `banned_note_${from.id}`;
+    const last = Number(await getConfig(env, key, "0")) || 0;
+    if (Date.now() - last < 60 * 60 * 1000) return;
+    await setConfig(env, key, String(Date.now())).catch(() => {});
     return send(env, chatId, t(lang0, "banned"));
   }
 
@@ -117,6 +124,16 @@ export async function handleUpdate(update, env) {
   const cmd = text.split(/\s+/)[0].toLowerCase().replace(/@.*$/, "");
   const isCommand = text.startsWith("/");
 
+  /* Deleting a pasted Cloudflare API token happens BEFORE the gate, and without
+   * acting on it.
+   *
+   * Removing a credential from a chat is the one piece of credential hygiene
+   * this bot performs, and the gate's early return skipped it. While the gate
+   * failed open that only ever affected deliberate non-members; now a real
+   * member who pastes a token during a Telegram blip is refused, their token
+   * stays in the chat forever, and the natural reaction is to paste it again. */
+  if (extractToken(text)) await deleteMessage(env, chatId, msg.message_id).catch(() => {});
+
   // Channel gate: everything below needs membership in our channel.
   const gate = await requireMember(env, from.id);
   if (!gate.ok) return refuseNonMember(env, chatId, from.id, lang, gate.chan);
@@ -129,11 +146,11 @@ export async function handleUpdate(update, env) {
    * gate exists to prevent. It also quietly inflated the user count. */
   await touchUser(env, from, normLang(from && from.language_code)).catch(() => {});
 
-  // A Cloudflare token anywhere in the message → delete it, then install or
-  // (if the user came from "Update my panel") update.
+  // A Cloudflare token anywhere in the message → install, or update if the user
+  // came from "Update my panel". The message itself was already deleted above,
+  // before the gate, so the token is gone from the chat either way.
   const token = extractToken(text);
   if (token) {
-    await deleteMessage(env, chatId, msg.message_id);
     const wantUpdate = (await getConfig(env, `await_utoken_${from.id}`, "")) === "1";
     const wantRecover = (await getConfig(env, `await_rtoken_${from.id}`, "")) === "1";
     // The token is spent; disarm everything so a second paste cannot re-run it.
@@ -322,8 +339,14 @@ async function menuMarkup(env, lang) {
  * not check this time". A chat-level error means the channel or the bot's rights
  * are misconfigured, nobody can be checked, and locking out every user helps no
  * one, so it fails open and says so in the log. Anything else is transient and
- * fails closed: the user is asked to join, and if they already have, the "I've
- * joined" button costs them one tap to get in.
+ * fails closed.
+ *
+ * Be honest about what failing closed costs. While the transient condition
+ * lasts, the bot is unusable for anyone whose 15-minute cache has expired, and
+ * "I've joined" does NOT rescue them: it runs this same check and refuses too.
+ * That is the accepted price of not standing open during a provokable outage,
+ * and the owner's override is `join_required` in the panel settings. It is not a
+ * mitigation, so it should not be written down as one.
  *
  * Non-members return ok:true with status "left" or "kicked", so ordinary refusal
  * never goes near this branch.
@@ -335,19 +358,29 @@ const MEMBER_CACHE_MS = 15 * 60 * 1000;
 // genuine joiner presses "I've joined" once and should not be made to wait.
 const NON_MEMBER_CACHE_MS = 30 * 1000;
 
-/* Errors that mean the check is broken for EVERYONE, not for this user. Only
- * these open the gate.
+/* Errors that open the gate.
+ *
+ * The rule is narrower than "an error we recognise": only errors that make the
+ * channel uncheckable FOR EVERYONE. The whole justification for opening is that
+ * refusing 26k people punishes them for the owner's settings, and that argument
+ * cannot apply to an error scoped to one account: refusing there costs that one
+ * person a tap, while opening hands the bypass to exactly the population the
+ * gate exists to refuse. So per-user errors fail closed, and this list contains
+ * no per-user entries.
  *
  * "member list is inaccessible" and "bot was kicked" are the two that matter
  * most and the two easiest to leave out, because they are what Telegram actually
  * says when the bot loses admin on the channel, which is the single most likely
- * way this ever breaks. Missing them would fail CLOSED and refuse every user of
- * the bot until someone noticed, which is a worse outage than the hole this
- * whole change was written to close.
+ * way this ever breaks. Missing them would refuse every user until a human
+ * noticed, which is a worse outage than the hole this exists to close.
  *
- * The user-level entries are safe to open on because the user id arrives inside
- * a webhook Telegram authenticated; nobody can choose their own id to provoke
- * one. */
+ * Deliberately absent, having been checked against what Telegram emits:
+ *   "Member not found"        the real per-user unresolvable case; fails closed
+ *   PARTICIPANT_ID_INVALID    per-participant, not per-chat; fails closed
+ *   USER_ID_INVALID           same
+ * An ordinary non-member never reaches this branch at all: Telegram reports them
+ * as ok:true with status "left".
+ */
 const CHAT_LEVEL_ERROR = new RegExp([
   "chat not found",
   "member list is inaccessible",     // bot is no longer an admin of the channel
@@ -356,9 +389,6 @@ const CHAT_LEVEL_ERROR = new RegExp([
   "not enough rights",
   "CHAT_ADMIN_REQUIRED",
   "CHANNEL_PRIVATE",
-  "USER_ID_INVALID",
-  "PARTICIPANT_ID_INVALID",
-  "user not found",
 ].join("|"), "i");
 
 function channelSlug(raw) {
@@ -366,9 +396,9 @@ function channelSlug(raw) {
 }
 
 async function requireMember(env, userId) {
-  if ((await getConfig(env, "join_required", "1")) !== "1") return { ok: true };
+  if ((await getConfig(env, "join_required", "1")) !== "1") return { ok: true, certain: true };
   const chan = channelSlug(await getConfig(env, "join_channel", "irnova_proxy"));
-  if (!chan) return { ok: true };
+  if (!chan) return { ok: true, certain: true };
 
   const cached = await getConfig(env, `member_${userId}`, "");
   if (cached) {
@@ -381,7 +411,9 @@ async function requireMember(env, userId) {
      * Neither is written today, and treating an impossible age as "no cache" and
      * re-checking costs one API call. */
     const fresh = age >= 0 && age < (negative ? NON_MEMBER_CACHE_MS : MEMBER_CACHE_MS);
-    if (fresh) return { ok: !negative, chan };
+    // `certain` is only ever set from an answer Telegram actually gave, and the
+    // cache is only ever written from one, so it carries through.
+    if (fresh) return { ok: !negative, chan, certain: true };
   }
 
   const r = await tg(env, "getChatMember", { chat_id: "@" + chan, user_id: userId }).catch(() => null);
@@ -391,14 +423,14 @@ async function requireMember(env, userId) {
     // Logged either way: this failure used to be completely invisible, so there
     // was no way to know how often the gate was already standing open.
     console.log("gate: getChatMember failed:", why, misconfigured ? "→ open (config)" : "→ closed (transient)");
-    return { ok: misconfigured, chan };
+    return { ok: misconfigured, chan, certain: false };
   }
 
   const st = r.result && r.result.status;
   const member = st === "creator" || st === "administrator" || st === "member" ||
     (st === "restricted" && r.result.is_member !== false);
   await setConfig(env, `member_${userId}`, (member ? "" : "!") + Date.now()).catch(() => {});
-  return { ok: member, chan };
+  return { ok: member, chan, certain: true };
 }
 
 function joinKeyboard(lang, chan) {
@@ -1479,23 +1511,31 @@ const GADMIN_CACHE_MS = 15 * 60 * 1000;
 async function isGroupAdmin(env, chatId, userId) {
   const key = `gadmin_${chatId}_${userId}`;
   const cached = await getConfig(env, key, "");
-  const age = Date.now() - Number(cached);
-  if (cached && age >= 0 && age < GADMIN_CACHE_MS) return true;
+  if (cached) {
+    const negative = cached[0] === "!";
+    const age = Date.now() - Number(negative ? cached.slice(1) : cached);
+    if (age >= 0 && age < GADMIN_CACHE_MS) return !negative;
+  }
   const r = await tg(env, "getChatMember", { chat_id: chatId, user_id: userId }).catch(() => null);
   const st = r && r.ok && r.result && r.result.status;
   const admin = st === "creator" || st === "administrator";
   // Clear on demotion rather than leaving a stale row that reads as truthy to
   // any future code that forgets to compare the timestamp.
-  if (admin) await setConfig(env, key, String(Date.now())).catch(() => {});
-  else if (cached) await setConfig(env, key, "").catch(() => {});
+  // Cache the NO as well. Without it every message from an ordinary member cost
+  // a live getChatMember, so the busiest group generated the most API calls, and
+  // API calls are what the gate now fails closed on.
+  await setConfig(env, key, (admin ? "" : "!") + Date.now()).catch(() => {});
   return admin;
 }
 
 async function handleCommunityMessage(msg, env) {
   const chatId = msg.chat.id;
 
-  // /id still works here so an admin can read the group's own id.
-  if ((msg.text || "").toLowerCase().startsWith("/id")) {
+  // /id still works here so an admin can read the group's own id, but only for
+  // an admin: to everyone else it was an unthrottled "make the bot post" button
+  // in the group with the most strangers in it.
+  if ((msg.text || "").toLowerCase().startsWith("/id")
+      && await isGroupAdmin(env, chatId, from && from.id)) {
     await send(env, chatId, `This chat's ID:\n<code>${chatId}</code>`);
     return;
   }
@@ -1525,14 +1565,23 @@ async function handleCommunityMessage(msg, env) {
   // this message, stop here so the membership gate below does not double-handle.
   if (await moderateProfanity(env, chatId, msg, from)) return;
 
-  // Membership gate: non-members lose their message until they join. Group
-  // admins are exempt. requireMember fails OPEN, so if the bot is not a channel
-  // admin the check errors and nobody is gated (a config mistake cannot wipe
-  // the group); it starts working once the bot can actually read membership.
+  /* Membership gate: non-members lose their message until they join, and group
+   * admins are exempt.
+   *
+   * Deleting is the one gate outcome that cannot be taken back, so it needs more
+   * than "not ok": it needs Telegram to have actually SAID this person is not a
+   * member. Everywhere else a closed gate means "here is a join button", which
+   * costs a member nothing during a blip. Here it would mean every message in
+   * the group is deleted for the duration of that blip, admins included, since
+   * isGroupAdmin fails closed in the same conditions. That is a worse outcome
+   * than letting a non-member speak for thirty seconds.
+   *
+   * `certain` is true only for an answer Telegram gave, so a 429, a 5xx or a
+   * dropped connection leaves the message exactly where it is. */
   if ((await getConfig(env, "community_gate", "1")) !== "1") return;
   if (await isGroupAdmin(env, chatId, from.id)) return;
   const m = await requireMember(env, from.id);
-  if (m.ok) return;
+  if (m.ok || !m.certain) return;
   await deleteMessage(env, chatId, msg.message_id).catch(() => {});
   await notifyGate(env, chatId, from, m.chan);
 }
