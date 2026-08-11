@@ -177,6 +177,11 @@ async function menuMarkup(env, lang) {
     [{ text: t(lang, "btn_install"), callback_data: "install", style: "success" }],
     [{ text: t(lang, "btn_update"), callback_data: "update", style: "primary" }],
     [{ text: t(lang, "btn_deploy"), callback_data: "deploy" }],
+    /* Nova Server, at the top level rather than only three taps down inside the
+     * deploy hub. It is a whole product and the people who want it arrive
+     * already knowing they do, so making them browse for it costs installs. It
+     * stays in the hub as well, for the people who are still deciding. */
+    [{ text: t(lang, "btn_vps"), callback_data: "dep_vps" }],
   ];
   for (const s of await listSections(env)) rows.push([{ text: s.title, callback_data: `sec:${s.id}` }]);
   const appsBtn = { text: t(lang, "btn_apps"), callback_data: "apps" };
@@ -188,6 +193,9 @@ async function menuMarkup(env, lang) {
   } else {
     rows.push([ghBtn]);
   }
+  // Where to follow us. The bot is the surface with the most users by a wide
+  // margin and was the only one carrying none of these.
+  rows.push([{ text: t(lang, "btn_socials"), callback_data: "socials" }]);
   rows.push([{ text: t(lang, "btn_lang"), callback_data: "lang" }]);
   rows.push([{ text: t(lang, "btn_support"), callback_data: "support", style: "danger" }]);
   return { inline_keyboard: rows };
@@ -269,6 +277,33 @@ async function showView(env, chatId, msgId, text, extra = {}) {
 
 function backRow(lang) {
   return [{ text: t(lang, "btn_back_menu"), callback_data: "menu" }];
+}
+
+/* Where to follow Nova. One screen rather than links scattered through the
+ * copy, and the URLs are the same five the website publishes, so a channel that
+ * moves is changed in one place per surface rather than found later by a user.
+ *
+ * The GitHub link is Nova-PROXY specifically, not a generic "our GitHub". Nova
+ * Server is closed by design, and pointing at the org invites people to go
+ * looking for source that is deliberately not there. */
+const SOCIALS = [
+  { key: "soc_tg", url: "https://t.me/irnova_proxy" },
+  { key: "soc_ig", url: "https://instagram.com/irnova_proxy" },
+  { key: "soc_x", url: "https://x.com/irNovaProxy" },
+  { key: "soc_yt", url: "https://youtube.com/@novaproxyir" },
+  { key: "soc_gh", url: "https://github.com/IRNova/Nova-Proxy" },
+];
+
+function socialsMarkup(lang) {
+  // Two per row for the four social apps, then GitHub on its own: five in a
+  // single column is a lot of scrolling on a phone.
+  const b = (s) => ({ text: t(lang, s.key), url: s.url });
+  return { inline_keyboard: [
+    [b(SOCIALS[0]), b(SOCIALS[1])],
+    [b(SOCIALS[2]), b(SOCIALS[3])],
+    [b(SOCIALS[4])],
+    backRow(lang),
+  ] };
 }
 
 // ── Language ────────────────────────────────────────────────────────────────
@@ -442,6 +477,8 @@ async function handleCallback(cb, env) {
   }
   if (data.startsWith("updg:")) return runUpdate(env, chatId, msgId, cb.from.id, +data.slice(5), lang);
   if (data === "support") return editSupport(env, chatId, msgId, lang);
+  if (data === "socials")
+    return showView(env, chatId, msgId, t(lang, "socials_text"), { reply_markup: socialsMarkup(lang) });
   if (data === "deploy")
     return showView(env, chatId, msgId, t(lang, "deploy_title"), { reply_markup: deployMarkup(lang) });
   if (data === "dep_panel") {
@@ -464,10 +501,26 @@ async function handleCallback(cb, env) {
 
 // ── Install intro ───────────────────────────────────────────────────────────
 
+// Cloudflare needs an email address to sign up with. Users who don't have one
+// (or who don't want their personal address on a proxy account) get sent to a
+// real provider rather than a disposable inbox: a throwaway address means no
+// password reset and no way to recover the panel later. Proton is listed first
+// because new Tuta free accounts can sit in a manual approval queue.
+const EMAIL_PROTON_URL = "https://account.proton.me/signup";
+const EMAIL_TUTA_URL = "https://app.tuta.com/signup";
+
+function emailRow(lang) {
+  return [
+    { text: t(lang, "btn_email_proton"), url: EMAIL_PROTON_URL },
+    { text: t(lang, "btn_email_tuta"), url: EMAIL_TUTA_URL },
+  ];
+}
+
 function installKeyboard(lang, withBack) {
   const rows = [
     [{ text: t(lang, "btn_get_token"), url: TOKEN_DEEPLINK, style: "primary" }],
     [{ text: t(lang, "btn_make_account"), url: "https://dash.cloudflare.com/sign-up" }],
+    emailRow(lang),
   ];
   if (withBack) rows.push(backRow(lang));
   return { inline_keyboard: rows };
@@ -543,6 +596,7 @@ function depPanelKeyboard(lang) {
   return { inline_keyboard: [
     [{ text: t(lang, "btn_get_token"), url: TOKEN_DEEPLINK, style: "primary" }],
     [{ text: t(lang, "btn_make_account"), url: "https://dash.cloudflare.com/sign-up" }],
+    emailRow(lang),
     depBackRow(lang),
   ] };
 }

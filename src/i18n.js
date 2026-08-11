@@ -21,7 +21,8 @@ export const STR = {
     install_text:
       "🚀 <b>Install Nova</b>\n\n" +
       "I'll build your own Nova panel on <b>your</b> Cloudflare account: worker and database, fully set up. About a minute.\n\n" +
-      "<b>1.</b> Need a free Cloudflare account? Make one first (1 min).\n\n" +
+      "<b>1.</b> Need a free Cloudflare account? Make one first (1 min).\n" +
+      "   • No email address yet? Make a free one with Proton or Tuta below, then use it to sign up.\n\n" +
       "<b>2.</b> Tap <b>Get my token</b>. A Cloudflare page opens, already filled in.\n" +
       "   • Scroll to the bottom → <b>Continue to summary</b>\n" +
       "   • Tap <b>Create Token</b>, then <b>Copy</b> the long code\n" +
@@ -30,6 +31,8 @@ export const STR = {
       "🇮🇷 In Iran: if the Cloudflare page won't open, turn on your current VPN first.",
     btn_get_token: "🔑 Get my token",
     btn_make_account: "Create a free Cloudflare account",
+    btn_email_proton: "✉️ Proton Mail",
+    btn_email_tuta: "✉️ Tuta Mail",
 
     building: "🛠 <b>Building your Nova…</b>",
     s_verify: "Checking your token",
@@ -124,6 +127,20 @@ export const STR = {
     support_title: "❤️ <b>Support us</b>\n\nNova is free and always will be. If it helps you, you can support the project:",
     support_notset: "❤️ Support isn't set up yet. Please check back later.",
 
+    // follow us
+    btn_socials: "🌐 Follow Nova",
+    socials_text:
+      "🌐 <b>Follow Nova</b>\n\n" +
+      "News, new releases and outage notices go out on the channel first. The rest is where we post guides, clips and updates.",
+    soc_tg: "📣 Telegram",
+    soc_ig: "📸 Instagram",
+    soc_x: "✖️ X",
+    soc_yt: "▶️ YouTube",
+    soc_gh: "💻 GitHub",
+
+    // Nova Server, promoted to the main menu as well as the deploy hub
+    btn_vps: "🖥 Nova on your own VPS",
+
     // deploy your own Nova (hub mirroring the app's onboarding)
     btn_deploy: "🧭 Deploy your own Nova",
     btn_back_deploy: "⬅️ Deploy options",
@@ -146,6 +163,7 @@ export const STR = {
       "• A Cloudflare API token (steps below)\n\n" +
       "<b>Steps:</b>\n" +
       "<b>1.</b> No account yet? Make a free one first (1 min).\n" +
+      "   • No email address yet? Make a free one with Proton or Tuta below, then use it to sign up.\n" +
       "<b>2.</b> Tap <b>Get my token</b>. A Cloudflare page opens, already filled in. Scroll down → <b>Continue to summary</b> → <b>Create Token</b>, then <b>Copy</b> the whole code.\n" +
       "<b>3.</b> Paste the token here. I delete it the moment it arrives and never store it.\n\n" +
       "🔑 <b>The token needs these permissions:</b>\n" +
@@ -176,7 +194,8 @@ export const STR = {
       "<code>bash &lt;(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node.sh)</code>\n" +
       "It installs everything, opens the firewall, and prints your panel address and admin password.\n" +
       "<b>2.</b> Open that address in your browser (or the Nova app), log in, create a user, and share the link or import it into the Nova app.\n\n" +
-      "Your VPS login is never sent anywhere, you run the command yourself on your own server.",
+      "Your VPS login is never sent anywhere, you run the command yourself on your own server.\n\n" +
+      "🤖 <b>Prefer not to touch a command line?</b> The button below opens <b>@NovaServerInstaller_Bot</b>, a separate bot that does the whole install for you. It is a different bot because installing on a VPS needs SSH, which this one cannot do. Same team, same project.",
     deploy_sub_text:
       "🔗 <b>Use an existing subscription</b>\n\n" +
       "Already have a subscription link or a config (from your own panel, a friend, or a provider)? You do not need to build anything.\n\n" +
@@ -201,7 +220,8 @@ export const STR = {
     install_text:
       "🚀 <b>نصب نوا</b>\n\n" +
       "پنل نوای شخصی‌ات را روی حساب <b>خودت</b> در Cloudflare می‌سازم: ورکر و دیتابیس، کاملاً آماده. حدود یک دقیقه.\n\n" +
-      "<b>۱.</b> حساب رایگان Cloudflare نداری؟ اول یکی بساز (۱ دقیقه).\n\n" +
+      "<b>۱.</b> حساب رایگان Cloudflare نداری؟ اول یکی بساز (۱ دقیقه).\n" +
+      "   • ایمیل نداری؟ با \u2066Proton\u2069 یا \u2066Tuta\u2069 رایگان یکی بساز (دکمه‌هایش پایین است) و با همان ثبت‌نام کن.\n\n" +
       "<b>۲.</b> روی <b>گرفتن توکن</b> بزن. یک صفحهٔ Cloudflare باز می‌شود که از قبل پر شده.\n" +
       "   • تا ته پایین برو ← <b>Continue to summary</b>\n" +
       "   • <b>Create Token</b> را بزن، بعد کدِ بلند را <b>Copy</b> کن\n" +
@@ -210,6 +230,10 @@ export const STR = {
       "🇮🇷 در ایران: اگر صفحهٔ Cloudflare باز نشد، اول VPN فعلی‌ات را روشن کن.",
     btn_get_token: "🔑 گرفتن توکن",
     btn_make_account: "ساخت حساب رایگان Cloudflare",
+    // Brand names, so they stay Latin in both languages. Defined here rather
+    // than left to the English fallback to keep the two blocks in sync.
+    btn_email_proton: "✉️ Proton Mail",
+    btn_email_tuta: "✉️ Tuta Mail",
 
     building: "🛠 <b>در حال ساخت نوای تو…</b>",
     s_verify: "بررسی توکن",
@@ -298,6 +322,20 @@ export const STR = {
     support_title: "❤️ <b>حمایت مالی</b>\n\nنوا رایگان است و همیشه رایگان می‌ماند. اگر برایت مفید بوده، می‌توانی از پروژه حمایت کنی:",
     support_notset: "❤️ حمایت هنوز تنظیم نشده. لطفاً بعداً سر بزن.",
 
+    // ما را دنبال کنید
+    btn_socials: "🌐 دنبال‌کردن نوا",
+    socials_text:
+      "🌐 <b>دنبال‌کردن نوا</b>\n\n" +
+      "خبرها، نسخه‌های تازه و اطلاع قطعی‌ها اول از همه در کانال می‌آید. بقیه جاهایی است که راهنما، ویدیو و به‌روزرسانی می‌گذاریم.",
+    soc_tg: "📣 تلگرام",
+    soc_ig: "📸 اینستاگرام",
+    soc_x: "✖️ ایکس",
+    soc_yt: "▶️ یوتیوب",
+    soc_gh: "💻 گیت‌هاب",
+
+    // نوا سرور، هم در منوی اصلی و هم در بخش راه‌اندازی
+    btn_vps: "🖥 نوا روی سرور خودت",
+
     // راه‌اندازی نوای خودت
     btn_deploy: "🧭 راه‌اندازی نوای خودت",
     btn_back_deploy: "⬅️ گزینه‌های راه‌اندازی",
@@ -320,6 +358,7 @@ export const STR = {
       "• یک توکن API از Cloudflare (مراحلش پایین)\n\n" +
       "<b>مراحل:</b>\n" +
       "<b>۱.</b> هنوز حساب نداری؟ اول یک حساب رایگان بساز (۱ دقیقه).\n" +
+      "   • ایمیل نداری؟ با \u2066Proton\u2069 یا \u2066Tuta\u2069 رایگان یکی بساز (دکمه‌هایش پایین است) و با همان ثبت‌نام کن.\n" +
       "<b>۲.</b> روی <b>گرفتن توکن</b> بزن. یک صفحهٔ Cloudflare باز می‌شود که از قبل پر شده. تا پایین برو ← <b>Continue to summary</b> ← <b>Create Token</b>، بعد کلِ کد را <b>Copy</b> کن.\n" +
       "<b>۳.</b> توکن را همین‌جا بچسبان. لحظه‌ای که برسد پاکش می‌کنم و هرگز ذخیره‌اش نمی‌کنم.\n\n" +
       "🔑 <b>توکن به این دسترسی‌ها نیاز دارد:</b>\n" +
@@ -350,7 +389,8 @@ export const STR = {
       "<code>bash &lt;(curl -fsSL https://raw.githubusercontent.com/IRNova/Nova-Server/main/nova-node.sh)</code>\n" +
       "همه چیز را نصب می‌کند، فایروال را باز می‌کند و آدرس پنل و رمز مدیریت را چاپ می‌کند.\n" +
       "<b>۲.</b> آن آدرس را در مرورگر (یا اپ نوا) باز کن، وارد شو، یک کاربر بساز و لینکش را به اشتراک بگذار یا در اپ نوا وارد کن.\n\n" +
-      "اطلاعات ورود سرورت هیچ‌جا فرستاده نمی‌شود، دستور را خودت روی سرور خودت اجرا می‌کنی.",
+      "اطلاعات ورود سرورت هیچ‌جا فرستاده نمی‌شود، دستور را خودت روی سرور خودت اجرا می‌کنی.\n\n" +
+      "🤖 <b>نمی‌خواهی با خط فرمان کار کنی؟</b> دکمهٔ زیر <b>@NovaServerInstaller_Bot</b> را باز می‌کند، رباتی جدا که کل نصب را برایت انجام می‌دهد. ربات جداست چون نصب روی VPS به SSH نیاز دارد و این ربات نمی‌تواند SSH بزند. همان تیم، همان پروژه.",
     deploy_sub_text:
       "🔗 <b>استفاده از اشتراک آماده</b>\n\n" +
       "از قبل یک لینک اشتراک یا کانفیگ داری (از پنل خودت، یک دوست، یا یک ارائه‌دهنده)؟ لازم نیست چیزی بسازی.\n\n" +
