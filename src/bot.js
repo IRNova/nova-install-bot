@@ -198,10 +198,14 @@ export async function handleUpdate(update, env) {
           "Send <code>/emojiid</code> followed by one or more custom emoji, or reply <code>/emojiid</code> to a message that has them.\n\n" +
           "Custom emoji only: the standard ones have no id.");
       }
-      const text = String(src.text || src.caption || "");
+      /* NOT `text`: that is the outer message text, and re-declaring it here
+       * put the whole case block in a temporal dead zone, so the pack-name
+       * branch above threw `Cannot access 'text' before initialization` and the
+       * command answered nothing at all. */
+      const body = String(src.text || src.caption || "");
       const lines = ents.map((e) => {
         // Entity offsets are in UTF-16 code units, which is what JS strings use.
-        const glyph = text.slice(e.offset, e.offset + e.length) || "?";
+        const glyph = body.slice(e.offset, e.offset + e.length) || "?";
         return `${glyph}  <code>${esc(e.custom_emoji_id)}</code>`;
       });
       return send(env, chatId, `Custom emoji ids:\n\n${lines.join("\n")}`);
