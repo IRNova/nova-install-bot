@@ -351,15 +351,16 @@ async function requireMember(env, userId) {
 
   const cached = await getConfig(env, `member_${userId}`, "");
   if (cached) {
-    /* A future-dated timestamp would otherwise satisfy this forever, which is a
-     * permanent silent bypass for that user. Nothing writes one today; the lower
-     * bound costs one comparison and removes the possibility. */
-    const age = Date.now() - Number(cached);
-    if (cached[0] === "!") {
-      if (Date.now() - Number(cached.slice(1)) < NON_MEMBER_CACHE_MS) return { ok: false, chan };
-    } else if (age >= 0 && age < MEMBER_CACHE_MS) {
-      return { ok: true, chan };
-    }
+    // "!" marks a refusal; a bare timestamp is a confirmed membership.
+    const negative = cached[0] === "!";
+    const age = Date.now() - Number(negative ? cached.slice(1) : cached);
+    /* The lower bound applies to BOTH branches. On the positive side a future
+     * timestamp would grant access forever; on the negative side it would refuse
+     * forever, which is a permanent lockout of one user by a single bad row.
+     * Neither is written today, and treating an impossible age as "no cache" and
+     * re-checking costs one API call. */
+    const fresh = age >= 0 && age < (negative ? NON_MEMBER_CACHE_MS : MEMBER_CACHE_MS);
+    if (fresh) return { ok: !negative, chan };
   }
 
   const r = await tg(env, "getChatMember", { chat_id: "@" + chan, user_id: userId }).catch(() => null);

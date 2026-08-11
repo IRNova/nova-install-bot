@@ -170,3 +170,13 @@ test("turning the gate off in settings still works", async () => {
   const h = await run(() => ({ ok: true, result: { status: "left" } }), { join_required: "0" });
   assert.ok(!wasRefused(h), "the gate ignored join_required=0");
 });
+
+test("a future-dated refusal is not a permanent lockout either", async () => {
+  /* The mirror of the bypass, and the reason the lower bound belongs on both
+   * branches rather than just the one the audit named: a single impossible
+   * timestamp on the negative side would refuse that user forever. Denial rather
+   * than access, so less severe, but just as silent and just as permanent. */
+  const future = String(Date.now() + 10 * 365 * 24 * 3600 * 1000);
+  const h = await run(() => ({ ok: true, result: { status: "member" } }), { member_5150: "!" + future });
+  assert.ok(!wasRefused(h), "a future-dated refusal locked a real member out forever");
+});
