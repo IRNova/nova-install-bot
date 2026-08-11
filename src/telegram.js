@@ -51,3 +51,29 @@ export function esc(s) {
   return String(s == null ? "" : s)
     .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
+
+/* Bidi isolation for a value dropped into mixed Farsi/English copy.
+ *
+ * Without it the bidi algorithm lets a value's direction leak into the text
+ * around it, so "پاسخ به @ali_2024" reorders and the punctuation ends up on the
+ * wrong side of the name. It gets worse the more the value looks like the
+ * opposite script, which is exactly the case nobody tests with.
+ *
+ * FSI (U+2068) rather than LRI (U+2066), because these values are names and
+ * usernames whose script is not known in advance: FSI takes its direction from
+ * the value's own first strong character, so a Latin name reads LTR and a Farsi
+ * name reads RTL, both inside the same sentence. Use the LRI form directly for
+ * runs known to be Latin (see the "IRNova" line in bot.js).
+ *
+ * Escape first, isolate second: the isolate characters are not HTML and must not
+ * be fed through esc(), and a value that skipped escaping is a bug either way.
+ */
+export function bidi(s) {
+  const v = String(s == null ? "" : s);
+  return v ? `⁨${v}⁩` : v;
+}
+
+/** esc() then bidi(): the usual pairing for a user-supplied name in copy. */
+export function escBidi(s) {
+  return bidi(esc(s));
+}

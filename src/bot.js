@@ -1,7 +1,7 @@
 // Update router: commands, main menu, FAQ, dynamic sections, contact flow.
 // Every user-facing string goes through i18n (English + Persian).
 
-import { tg, send, edit, sendPhoto, editCaption, answerCb, deleteMessage, esc } from "./telegram.js";
+import { tg, send, edit, sendPhoto, editCaption, answerCb, deleteMessage, esc, bidi, escBidi } from "./telegram.js";
 import {
   touchUser, getConfig, setConfig, listFaq, getFaq, listSections, getSection,
   markBlocked, getUserLang, setUserLang, isBanned, setBanned,
@@ -453,7 +453,7 @@ async function handleCallback(cb, env) {
       : `<a href="tg://user?id=${a.id}">${esc(a.first_name || "admin")}</a>`;
     const prompt =
       `${mention}\n` +
-      `✍️ <b>Reply to ${esc(name)}</b> / پاسخ به ${esc(name)}\n` +
+      `✍️ <b>Reply to ${escBidi(name)}</b> / پاسخ به ${escBidi(name)}\n` +
       `Type your message below / پیام خود را بنویسید`;
     const sent = await send(env, group, prompt, {
       reply_markup: { force_reply: true, selective: true, input_field_placeholder: "Your reply / پاسخ شما" },
@@ -508,9 +508,12 @@ async function handleCallback(cb, env) {
     const qaId = Number(rawId);
     await setQaSource(env, qaId, closing ? "closed" : "suggestion").catch(() => {});
     const who = cb.from.first_name || "admin";
+    // bidi, not escBidi: appendToCard sends text with `entities` and no
+    // parse_mode, so this line is plain text and escaping would print the
+    // entities themselves ("&amp;") to the group.
     const note = closing
-      ? `\n\n🗑 Closed by ${who} / بسته شد`
-      : `\n\n💡 Saved as an idea by ${who} / به‌عنوان پیشنهاد ثبت شد`;
+      ? `\n\n🗑 Closed by ${bidi(who)} / بسته شد`
+      : `\n\n💡 Saved as an idea by ${bidi(who)} / به‌عنوان پیشنهاد ثبت شد`;
     /* Closing is terminal, so the buttons go. An idea is not: the user asked for
      * something and is still owed a "noted, thanks", so a 💡 card keeps Reply. */
     let kb = { inline_keyboard: [] };
@@ -1122,7 +1125,10 @@ async function forwardContact(env, from, chatId, msg, lang, { qaId = null, note 
    * before a deploy from a stale repo reverted it to English only. */
   const product = await inferProduct(env, from.id, said);
   const intro = (note ? note + "\n\n" : "")
-    + `✉️ <b>New message</b> / پیام جدید   ${PRODUCTS[product].tag}\n\n`;
+    // The tag is a Latin word directly after a Farsi one, which is the same leak
+    // in miniature. retagCard still finds it: indexOf matches inside the
+    // isolates and the swap leaves them in place.
+    + `✉️ <b>New message</b> / پیام جدید   ${bidi(PRODUCTS[product].tag)}\n\n`;
   const tail = `\n\n<i>Tap Reply below, or reply to this message, to answer them. / `
     + `برای پاسخ، دکمهٔ «پاسخ» را بزنید یا روی همین پیام ریپلای کنید.</i>`;
   const kb = contactKb(from.id, false, false, null, qaId, product);
@@ -1393,7 +1399,7 @@ async function moderateProfanity(env, chatId, msg, from) {
     await tg(env, "banChatMember", { chat_id: chatId, user_id: from.id }).catch(() => {});
     await setBanned(env, from.id, true).catch(() => {});
     await setOffenderStatus(env, from.id, "banned", 0).catch(() => {});
-    notice = `🚫 ${name} was removed for repeated abusive messages.\nبه‌دلیل پیام‌های توهین‌آمیز مکرر حذف شد.`;
+    notice = `🚫 ${bidi(name)} was removed for repeated abusive messages.\nبه‌دلیل پیام‌های توهین‌آمیز مکرر حذف شد.`;
   } else if (n >= muteAt) {
     await tg(env, "restrictChatMember", {
       chat_id: chatId, user_id: from.id,
@@ -1404,9 +1410,9 @@ async function moderateProfanity(env, chatId, msg, from) {
       },
     }).catch(() => {});
     await setOffenderStatus(env, from.id, "muted", Date.now() + muteMin * 60000).catch(() => {});
-    notice = `🔇 ${name}, muted ${muteMin} min for abusive language.\nبه‌دلیل زبان توهین‌آمیز ${muteMin} دقیقه بی‌صدا شدی.`;
+    notice = `🔇 ${bidi(name)}, muted ${muteMin} min for abusive language.\nبه‌دلیل زبان توهین‌آمیز ${muteMin} دقیقه بی‌صدا شدی.`;
   } else {
-    notice = `⚠️ ${name}, please keep it civil, abusive messages are removed.\nلطفاً ادب را رعایت کن؛ پیام‌های توهین‌آمیز حذف می‌شوند.`;
+    notice = `⚠️ ${bidi(name)}, please keep it civil, abusive messages are removed.\nلطفاً ادب را رعایت کن؛ پیام‌های توهین‌آمیز حذف می‌شوند.`;
   }
   const sent = await send(env, chatId, notice).catch(() => null);
   if (sent && sent.ok && sent.result) {

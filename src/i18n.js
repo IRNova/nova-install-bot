@@ -1,3 +1,8 @@
+/* bidi() isolates a value so its direction cannot leak into the sentence
+ * around it. Needed in the Farsi strings below wherever a name, username or
+ * Cloudflare worker name (all typically Latin) lands inside RTL copy. */
+import { bidi } from "./telegram.js";
+
 // Bot copy in English and Persian. t(lang, key) returns the string; anything
 // missing falls back to English. Keep both blocks in sync when adding keys.
 
@@ -205,7 +210,7 @@ export const STR = {
 
   fa: {
     menu_title: "⚡️ <b>پنل مدیریت نوا در تلگرام</b> ⚡️",
-    menu_hi: (name) => `👋 سلام ${name}!`,
+    menu_hi: (name) => `👋 سلام ${bidi(name)}!`,
     menu_body:
       "در حدود یک دقیقه پنل پراکسی نوای شخصی‌ات را روی حساب Cloudflare خودت می‌سازم و به‌روز نگهش می‌دارم.\n\n📌 از گزینه‌های زیر جهت ساخت یا مدیریت پنل‌های خود استفاده کنید:",
     btn_install: "ساخت پنل جدید",
@@ -307,11 +312,11 @@ export const STR = {
     upd_none_verified:
       "در حساب‌های در دسترس پنل نوای تأییدشده‌ای پیدا نکردم. فقط ورکرهایی نشان داده می‌شوند که اتصال DB لازم نوا را دارند.",
     upd_confirm: (name) =>
-      `⚠️ <b>«${name}» به‌روز شود؟</b>\n\nکد آن ورکر با آخرین نسخهٔ نوا جایگزین می‌شود. تنظیمات، کاربران و داده‌ها حفظ می‌شوند. فقط وقتی ادامه بده که این ورکر واقعاً پنل نوای تو باشد.`,
+      `⚠️ <b>«${bidi(name)}» به‌روز شود؟</b>\n\nکد آن ورکر با آخرین نسخهٔ نوا جایگزین می‌شود. تنظیمات، کاربران و داده‌ها حفظ می‌شوند. فقط وقتی ادامه بده که این ورکر واقعاً پنل نوای تو باشد.`,
     btn_upd_go: "✅ به‌روزرسانی کن",
     btn_upd_cancel: "✖️ انصراف",
     upd_run: "⏳ <b>در حال به‌روزرسانی…</b>",
-    upd_done: (name) => `✅ <b>انجام شد!</b>\n\n«${name}» حالا آخرین نسخهٔ نوا را اجرا می‌کند.`,
+    upd_done: (name) => `✅ <b>انجام شد!</b>\n\n«${bidi(name)}» حالا آخرین نسخهٔ نوا را اجرا می‌کند.`,
     upd_fail: "❌ به‌روزرسانی ناموفق بود",
     upd_not_nova: "این ورکر دیگر اتصال DB لازم نوا را ندارد، بنابراین تغییری نکرد.",
     upd_bindings_changed:
