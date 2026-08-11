@@ -210,13 +210,26 @@ export async function pruneProductHints(env) {
    * in under two weeks and stays well inside a cron tick after that. */
   const dead = await env.DB.prepare(
     "DELETE FROM config WHERE rowid IN (SELECT rowid FROM config " +
-    "WHERE (key LIKE 'await\\_%' ESCAPE '\\' OR key LIKE 'member\\_%' ESCAPE '\\') " +
+    "WHERE (key LIKE 'await\\_%' ESCAPE '\\' OR key LIKE 'member\\_%' ESCAPE '\\' " +
+    "  OR key LIKE 'gate\\_dm\\_%' ESCAPE '\\' OR key LIKE 'gadmin\\_%' ESCAPE '\\') " +
     "AND (value IS NULL OR value = '') LIMIT 5000)"
   ).run().catch(() => null);
+
+  /* The gate's short-lived rows: a 30-second "not a member" note, and the
+   * 10-minute stamp that stops a refusal repeating. Both are worthless within
+   * the hour, and without a sweep the bot would leave one row behind for every
+   * non-member who ever messaged it, which is the accumulation this whole
+   * function exists to stop rather than to recreate. */
+  const stale = await env.DB.prepare(
+    "DELETE FROM config WHERE rowid IN (SELECT rowid FROM config WHERE (" +
+    "  (key LIKE 'member\\_%' ESCAPE '\\' AND value LIKE '!%')" +
+    "  OR key LIKE 'gate\\_dm\\_%' ESCAPE '\\'" +
+    ") AND CAST(replace(value, '!', '') AS INTEGER) < ? LIMIT 5000)"
+  ).bind(Date.now() - 24 * 60 * 60 * 1000).run().catch(() => null);
   // null, not 0, when a statement failed: in the cron log a statement that threw
   // every night and a statement with nothing to do must not read the same.
   const changed = (r) => (r && r.meta ? r.meta.changes || 0 : null);
-  return { tags: changed(tags), flows: changed(flows), dead: changed(dead) };
+  return { tags: changed(tags), flows: changed(flows), dead: changed(dead), stale: changed(stale) };
 }
 
 /** Questions an admin flagged as a product suggestion, newest first. */

@@ -40,10 +40,22 @@ export default {
     const url = new URL(request.url);
 
     if (request.method === "GET" && url.pathname === "/") {
-      // One-off, idempotent trigger to push the bot's profile description (with
-      // the Farsi bidi fix) to Telegram. Safe to hit: it only re-applies the
-      // baked-in text, and skips the API call once the stored version matches.
+      /* One-off trigger to push the bot's profile description to Telegram.
+       *
+       * It was open to the internet and `&force=1` skipped its own idempotence
+       * check, so a plain curl loop from anyone at all made two setMyDescription
+       * calls and a database write per request. That is not just noise: it is
+       * the cheapest way to push the bot token into Telegram's flood control,
+       * and the membership gate now deliberately fails CLOSED under exactly that
+       * condition, so leaving this open would hand any stranger a way to lock
+       * every user out. Same key as /setup/register-webhook, compared in
+       * constant time.
+       */
       if (url.searchParams.get("sync") === "profile") {
+        const key = request.headers.get("X-Setup-Key") || "";
+        if (!env.WEBHOOK_SECRET || !timingSafeEqual(key, env.WEBHOOK_SECRET)) {
+          return new Response("forbidden", { status: 403 });
+        }
         const r = await syncBotProfile(env, { force: url.searchParams.get("force") === "1" });
         return new Response(JSON.stringify(r), {
           headers: { "Content-Type": "application/json;charset=utf-8" },

@@ -84,8 +84,16 @@ export async function handleUpdate(update, env) {
   }
 
   if (msg.chat.type !== "private") {
+    /* /id is a setup tool for wiring the admin and community groups, so it
+     * answers only the people doing that wiring. Open to anyone, it was a free
+     * "make the bot post" primitive in any group a stranger added it to, which
+     * costs the same send budget the membership gate now depends on. */
     if ((msg.text || "").toLowerCase().startsWith("/id")) {
-      await send(env, msg.chat.id, `This chat's ID:\n<code>${msg.chat.id}</code>`);
+      const admins = await getPanelAdminIds(env).catch(() => []);
+      const asker = msg.from && String(msg.from.id);
+      if (admins.includes(asker) || await isGroupAdmin(env, msg.chat.id, msg.from && msg.from.id)) {
+        await send(env, msg.chat.id, `This chat's ID:\n<code>${msg.chat.id}</code>`);
+      }
     }
     return;
   }
@@ -99,7 +107,6 @@ export async function handleUpdate(update, env) {
     return send(env, chatId, t(lang0, "banned"));
   }
 
-  await touchUser(env, from, normLang(from && from.language_code)).catch(() => {});
   const lang = lang0;
   const text = (msg.text || "").trim();
   // A user in the contact flow may send a photo or video (no text) as their
@@ -112,9 +119,15 @@ export async function handleUpdate(update, env) {
 
   // Channel gate: everything below needs membership in our channel.
   const gate = await requireMember(env, from.id);
-  if (!gate.ok) {
-    return send(env, chatId, t(lang, "join_text"), { reply_markup: joinKeyboard(lang, gate.chan) });
-  }
+  if (!gate.ok) return refuseNonMember(env, chatId, from.id, lang, gate.chan);
+
+  /* Enrolled only now, on the far side of the gate.
+   *
+   * This used to run before the check, so someone who deliberately did not join
+   * the channel was still written into `users` and then received every
+   * broadcast, which is precisely the "bot does something for a non-member" the
+   * gate exists to prevent. It also quietly inflated the user count. */
+  await touchUser(env, from, normLang(from && from.language_code)).catch(() => {});
 
   // A Cloudflare token anywhere in the message → delete it, then install or
   // (if the user came from "Update my panel") update.
@@ -196,8 +209,10 @@ export async function handleUpdate(update, env) {
      * Usage: reply /emojiid to a message containing the emoji, or send
      * /emojiid followed by them on the same line. */
     case "/emojiid": {
+      // Not `admins.length && ...`: with no admins configured that short-circuit
+      // opened a developer tool to every user. No allowlist means no access.
       const admins = await getPanelAdminIds(env);
-      if (admins.length && !admins.includes(String(from.id))) return;
+      if (!admins.includes(String(from.id))) return;
       /* `/emojiid <packname>` reads the WHOLE set from the Bot API instead of
        * from a message. Collecting ids by pasting emoji into a chat means
        * finding the pack in the client's picker, which is fiddly and silently
@@ -290,13 +305,40 @@ async function menuMarkup(env, lang) {
   return { inline_keyboard: rows };
 }
 
-// ── Channel membership gate ─────────────────────────────────────────────────
-// Users must be in the configured channel to use the bot. The bot has to be an
-// admin of that channel for getChatMember to work; if the check itself errors
-// (bot not admin, bad channel name) we fail OPEN so a config mistake can't
-// lock every user out. Confirmed memberships are cached for 15 minutes.
+/* ── Channel membership gate ────────────────────────────────────────────────
+ *
+ * Users must be in the configured channel to use the bot.
+ *
+ * The hard part is not the check, it is what to do when the check does not
+ * answer. This used to treat ANY non-ok reply as a yes, on the reasoning that a
+ * config mistake must not lock 26k people out. That reasoning is right about
+ * config mistakes and wrong about everything else: `ok:false` also covers a 429
+ * from flood control, a 5xx, a gateway page that is not even JSON, and a dropped
+ * connection. So the gate opened for everyone during exactly the conditions an
+ * attacker can provoke, and it did so silently, which is why nobody would ever
+ * have noticed it happening.
+ *
+ * The distinction now drawn is between "we cannot check anyone" and "we could
+ * not check this time". A chat-level error means the channel or the bot's rights
+ * are misconfigured, nobody can be checked, and locking out every user helps no
+ * one, so it fails open and says so in the log. Anything else is transient and
+ * fails closed: the user is asked to join, and if they already have, the "I've
+ * joined" button costs them one tap to get in.
+ *
+ * Non-members return ok:true with status "left" or "kicked", so ordinary refusal
+ * never goes near this branch.
+ */
 
 const MEMBER_CACHE_MS = 15 * 60 * 1000;
+// Short, and deliberately much shorter than the positive cache: it only exists
+// to stop one spammer minting an unlimited number of getChatMember calls, and a
+// genuine joiner presses "I've joined" once and should not be made to wait.
+const NON_MEMBER_CACHE_MS = 30 * 1000;
+
+/* Errors that mean the check is broken for EVERYONE, not for this user. Only
+ * these open the gate. */
+const CHAT_LEVEL_ERROR =
+  /chat not found|bot is not a member|not enough rights|CHAT_ADMIN_REQUIRED|CHANNEL_PRIVATE|USER_ID_INVALID|user not found/i;
 
 function channelSlug(raw) {
   return (raw || "").trim().replace(/^https?:\/\/t\.me\//i, "").replace(/^@/, "");
@@ -306,14 +348,34 @@ async function requireMember(env, userId) {
   if ((await getConfig(env, "join_required", "1")) !== "1") return { ok: true };
   const chan = channelSlug(await getConfig(env, "join_channel", "irnova_proxy"));
   if (!chan) return { ok: true };
+
   const cached = await getConfig(env, `member_${userId}`, "");
-  if (cached && Date.now() - Number(cached) < MEMBER_CACHE_MS) return { ok: true, chan };
+  if (cached) {
+    /* A future-dated timestamp would otherwise satisfy this forever, which is a
+     * permanent silent bypass for that user. Nothing writes one today; the lower
+     * bound costs one comparison and removes the possibility. */
+    const age = Date.now() - Number(cached);
+    if (cached[0] === "!") {
+      if (Date.now() - Number(cached.slice(1)) < NON_MEMBER_CACHE_MS) return { ok: false, chan };
+    } else if (age >= 0 && age < MEMBER_CACHE_MS) {
+      return { ok: true, chan };
+    }
+  }
+
   const r = await tg(env, "getChatMember", { chat_id: "@" + chan, user_id: userId }).catch(() => null);
-  if (!r || r.ok !== true) return { ok: true, chan };
+  if (!r || r.ok !== true) {
+    const why = String((r && r.description) || "network/unparsable");
+    const misconfigured = CHAT_LEVEL_ERROR.test(why);
+    // Logged either way: this failure used to be completely invisible, so there
+    // was no way to know how often the gate was already standing open.
+    console.log("gate: getChatMember failed:", why, misconfigured ? "→ open (config)" : "→ closed (transient)");
+    return { ok: misconfigured, chan };
+  }
+
   const st = r.result && r.result.status;
   const member = st === "creator" || st === "administrator" || st === "member" ||
     (st === "restricted" && r.result.is_member !== false);
-  if (member) await setConfig(env, `member_${userId}`, String(Date.now()));
+  await setConfig(env, `member_${userId}`, (member ? "" : "!") + Date.now()).catch(() => {});
   return { ok: member, chan };
 }
 
@@ -322,6 +384,25 @@ function joinKeyboard(lang, chan) {
     [{ text: t(lang, "btn_join"), url: `https://t.me/${chan}`, style: "primary" }],
     [{ text: t(lang, "btn_joined"), callback_data: "joined", style: "success" }],
   ] };
+}
+
+/* The refusal, at most once every 10 minutes per user.
+ *
+ * Every non-member message used to produce a reply with no throttle, so a
+ * spammer got an unlimited stream back. That is a nuisance on its own and it is
+ * also the main organic way the bot walks into Telegram's flood control, which
+ * is the condition the gate now deliberately fails closed on. The community
+ * group already throttles its notice this way; direct messages did not.
+ *
+ * Silence after the first notice is the right behaviour: the user has been told,
+ * and has a button.
+ */
+async function refuseNonMember(env, chatId, userId, lang, chan) {
+  const key = `gate_dm_${userId}`;
+  const last = Number(await getConfig(env, key, "")) || 0;
+  if (Date.now() - last < 10 * 60 * 1000) return;
+  await setConfig(env, key, String(Date.now())).catch(() => {});
+  return send(env, chatId, t(lang, "join_text"), { reply_markup: joinKeyboard(lang, chan) });
 }
 
 async function menuText(env, from, lang) {
@@ -623,13 +704,13 @@ async function handleCallback(cb, env) {
     return;
   }
 
-  await touchUser(env, cb.from, normLang(cb.from && cb.from.language_code)).catch(() => {});
   const lang = (await getUserLang(env, cb.from.id)) || normLang(cb.from && cb.from.language_code);
 
   // "I've joined" re-checks membership; everything else is behind the gate.
   if (data === "joined") {
     const gate = await requireMember(env, cb.from.id);
     if (!gate.ok) return answerCb(env, cb.id, t(lang, "join_no"), true);
+    await touchUser(env, cb.from, normLang(cb.from && cb.from.language_code)).catch(() => {});
     await answerCb(env, cb.id, t(lang, "join_ok"));
     return replaceWithMenu(env, chatId, msgId, cb.from, lang);
   }
@@ -638,6 +719,7 @@ async function handleCallback(cb, env) {
     await answerCb(env, cb.id);
     return showView(env, chatId, msgId, t(lang, "join_text"), { reply_markup: joinKeyboard(lang, gate.chan) });
   }
+  await touchUser(env, cb.from, normLang(cb.from && cb.from.language_code)).catch(() => {});
 
   await answerCb(env, cb.id);
 
@@ -1363,13 +1445,27 @@ async function logGroupMsg(env, chatId, messageId, keep) {
 }
 
 // Group admins (and the group owner) post freely, gate or not. Cached 15 min.
+/* Group admins are exempt from the channel gate and from the profanity filter in
+ * the community group.
+ *
+ * This stored "1" with no timestamp while claiming to cache for 15 minutes, so
+ * the exemption was permanent: anyone made an admin once, even for a minute, kept
+ * both exemptions forever, and demoting them in Telegram did nothing. Storing the
+ * time makes a demotion take effect within one cache window, like membership. */
+const GADMIN_CACHE_MS = 15 * 60 * 1000;
+
 async function isGroupAdmin(env, chatId, userId) {
   const key = `gadmin_${chatId}_${userId}`;
-  if (await getConfig(env, key, "")) return true;
+  const cached = await getConfig(env, key, "");
+  const age = Date.now() - Number(cached);
+  if (cached && age >= 0 && age < GADMIN_CACHE_MS) return true;
   const r = await tg(env, "getChatMember", { chat_id: chatId, user_id: userId }).catch(() => null);
   const st = r && r.ok && r.result && r.result.status;
   const admin = st === "creator" || st === "administrator";
-  if (admin) await setConfig(env, key, "1");
+  // Clear on demotion rather than leaving a stale row that reads as truthy to
+  // any future code that forgets to compare the timestamp.
+  if (admin) await setConfig(env, key, String(Date.now())).catch(() => {});
+  else if (cached) await setConfig(env, key, "").catch(() => {});
   return admin;
 }
 
