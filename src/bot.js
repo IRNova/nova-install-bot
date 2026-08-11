@@ -171,6 +171,25 @@ export async function handleUpdate(update, env) {
     case "/emojiid": {
       const admins = await getPanelAdminIds(env);
       if (admins.length && !admins.includes(String(from.id))) return;
+      /* `/emojiid <packname>` reads the WHOLE set from the Bot API instead of
+       * from a message. Collecting ids by pasting emoji into a chat means
+       * finding the pack in the client's picker, which is fiddly and silently
+       * gives you a standard emoji when it goes wrong. `getStickerSet` returns
+       * every sticker with its `custom_emoji_id` and its assigned emoji, in
+       * pack order, which is exactly the mapping needed and cannot be got wrong.
+       */
+      const packArg = (text.split(/\s+/)[1] || "").trim().replace(/^.*addemoji\//, "");
+      if (packArg && !/^[\p{Emoji}️‍]/u.test(packArg)) {
+        const r = await tg(env, "getStickerSet", { name: packArg });
+        if (!r || r.ok !== true) {
+          return send(env, chatId, `No set named <code>${esc(packArg)}</code>. ${esc((r && r.description) || "")}`);
+        }
+        const list = (r.result.stickers || []).map((s, i) =>
+          `${i + 1}. ${s.emoji || "?"}  <code>${esc(s.custom_emoji_id || "(not a custom emoji)")}</code>`);
+        return send(env, chatId,
+          `<b>${esc(r.result.title)}</b> (<code>${esc(r.result.name)}</code>)\n` +
+          `${list.length} emoji, in pack order:\n\n${list.join("\n")}`);
+      }
       const src = msg.reply_to_message || msg;
       const ents = [...(src.entities || []), ...(src.caption_entities || [])]
         .filter((e) => e.type === "custom_emoji" && e.custom_emoji_id);
